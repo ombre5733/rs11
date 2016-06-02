@@ -19,7 +19,7 @@ int nextPower(int prev)
 
 
 
-
+#ifndef _MSC_VER
 template <typename T, T... TIndices>
 struct integer_sequence
 {
@@ -84,6 +84,7 @@ using make_integer_sequence = typename weos_detail::MakeSafeIntegerSequence<T, N
 //! Creates the integer sequence 0, 1, 2, ... N - 1 with type std::size_t.
 template <std::size_t N>
 using make_index_sequence = make_integer_sequence<std::size_t, N>;
+#endif
 
 template <typename... TArgs>
 using index_sequence_for = make_index_sequence<sizeof...(TArgs)>;
@@ -250,6 +251,12 @@ constexpr detail::IncrArray GF256Element::m_antiLogTable;
 constexpr detail::IncrArray GF256Element::m_logTable;
 
 
+template<typename T> constexpr
+T const& cmax(T const& a, T const& b)
+{
+    return a > b ? a : b;
+}
+
 //! A polynomial with coefficients in GF(2^8).
 //!
 //! The GF256Polynomial is a polynomial whose coefficients are elements
@@ -293,20 +300,16 @@ public:
 //    }
 
     template <std::size_t TDeg>
-    constexpr
-    auto operator+(const GF256Polynomial<TDeg>& b) const noexcept
-        -> GF256Polynomial<(TDegree > TDeg) ? TDegree : TDeg>
+    constexpr GF256Polynomial<cmax(TDegree ,TDeg)> operator+(const GF256Polynomial<TDeg>& b) const noexcept
     {
-        return doAdd(b, make_index_sequence<((TDegree > TDeg) ? TDegree : TDeg) + 1>());
+        return doAdd(b, make_index_sequence<cmax(TDegree, TDeg) + 1>());
     }
 
     template <std::size_t TDeg>
-    constexpr
-    auto operator-(const GF256Polynomial<TDeg>& b) const noexcept
-        -> GF256Polynomial<(TDegree > TDeg) ? TDegree : TDeg>
+    constexpr auto operator-(const GF256Polynomial<TDeg>& b) const noexcept -> GF256Polynomial<cmax(TDegree, TDeg)>
     {
         // Subtraction in GF(2^8) equals addition.
-        return doAdd(b, make_index_sequence<((TDegree > TDeg) ? TDegree : TDeg) + 1>());
+        return doAdd(b, make_index_sequence<cmax(TDegree, TDeg) + 1>());
     }
 
     //! Returns the product of two polynomials.
