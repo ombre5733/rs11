@@ -293,11 +293,18 @@ class GF256Polynomial
     }
 
 public:
-//    constexpr
-//    GF256Polynomial() noexcept
-//        : _m_coefficients{}
-//    {
-//    }
+    constexpr GF256Polynomial() noexcept
+        : _m_coefficients{}
+    {
+    }
+
+    constexpr GF256Polynomial(const GF256Element(&poly)[TDegree + 1]) noexcept
+    {
+        using namespace std;
+        copy(begin(poly), end(poly), begin(_m_coefficients));
+    }
+
+
 
     template <std::size_t TDeg>
     constexpr GF256Polynomial<cmax(TDegree ,TDeg)> operator+(const GF256Polynomial<TDeg>& b) const noexcept
@@ -336,9 +343,9 @@ public:
     {
         return degree <= TDegree ? _m_coefficients[degree] : GF256Element();
     }
-
+protected:
     // The coefficients of the polynomial.
-    GF256Element _m_coefficients[TDegree + 1];
+    GF256Element _m_coefficients[TDegree + 1] = { 0, };
 };
 
 template <std::size_t N>
@@ -396,9 +403,12 @@ class ReedSolomon
 public:
     constexpr
     ReedSolomon() noexcept
-        : m_scratchIter(&m_scratch[0]),
+        :
+          //m_scratch(),
+          m_scratchIter(&m_scratch[0]),
           m_finished(false)
     {
+		std::fill(std::begin(m_scratch), std::end(m_scratch), GF256Element());
     }
 
     void finish() noexcept
@@ -466,8 +476,10 @@ private:
     }
 
     // createRootPolynomial(4, GF256Polynomial{1})
-    GF256Polynomial<10> m_polynomial;
-    GF256Element m_scratch[numParity + 1];
+public:
+    GF256Polynomial<4> m_polynomial = { {1, 30, 216, 231, 116} };
+protected:
+    GF256Element m_scratch[numParity + 1] = { 0, };
     GF256Element* m_scratchIter;
     bool m_finished;
 };
@@ -475,31 +487,13 @@ private:
 
 int main()
 {
-    using namespace std;
-
-#if 1
-    auto pwrTable = detail::createPowerTable(0, {});
-    cout << pwrTable << endl;
-
-    auto logTable = detail::createLogTable(pwrTable, 0, {});
-    cout << logTable << endl;
-#endif
-
-    GF256Element a(2);
-    GF256Element b(6);
-    cout << (a * b).value() << endl;
-    cout << (b + b).value() << endl;
-
-    for (int e : {255, 256, 511, 512, 513})
-        cout << e << "   " << e % 256 + e / 256 << "   " << e % 255 << endl;
-
-    cout << GF256Element(1) * GF256Element(3) << endl;
-
-    GF256Polynomial<1> pa{1, 1};
-    GF256Polynomial<2> pb{3, 4, 5};
-
-    cout << pa << endl;
-    cout << pb << endl;
-    cout << (pa + pb) << endl;
-    cout << (pa * pb) << endl;
+	using namespace std;
+	ReedSolomon<255, 251> rs;
+	uint8_t msg[251] = { 0, };
+	for (int i = 0; i < 171; i++)
+	{
+		msg[i] = i+1;
+	}
+    //msg[0] = 7;
+	rs.encode(msg, sizeof(msg));
 }
