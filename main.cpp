@@ -20,6 +20,14 @@ constexpr GF256Polynomial<4> POLY_255_251 = { { 1, 30, 216, 231, 116 } };
 
 #include "testvectors.h"
 
+// Usage model for AT45DB FLASH (512/528 byte page)
+// Shortened (zero padded) RS<171,175> build from RS<255,251>
+// 512 bytes spitted in 3 segments:
+// Option A:    171 171 170  +  4 4 4 parity = 524 bytes -> 4 bytes unused (wear leveling or possibly CRC32 for fast correction need check)
+// Option B:    172 172 168  +  4 4 4 parity = 524 bytes -> 4 bytes unused (wear leveling or possibly CRC32 for fast correction need check)
+// Only benefit might by that 172/4 is integer
+// CRC32 might also ensure error detection for more than 2 symbols in error ???
+
 int main()
 {
 	using namespace std;
