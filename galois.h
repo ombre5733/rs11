@@ -155,6 +155,11 @@ public:
     //        return m_antiLogTable[trueMod(p)];
     //    }
 
+    constexpr bool operator==(GF256Element b) const noexcept
+    {
+        return m_value == b.m_value;
+    }
+
 private:
     std::uint8_t m_value;
 
@@ -271,6 +276,13 @@ public:
     {
         return _m_coefficients[degree];
     }
+
+    constexpr bool operator==(const GF256Polynomial& rhs) const noexcept
+    {
+        using namespace std;
+        return equal(begin(_m_coefficients), end(_m_coefficients), begin(rhs._m_coefficients));
+    }
+
 
 protected:
     // The coefficients of the polynomial.

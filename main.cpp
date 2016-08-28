@@ -1,8 +1,9 @@
+#include "reed_solomon.h"
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
-#include "reed_solomon.h"
+
 
 using namespace std;
 
@@ -24,14 +25,15 @@ int main()
 	using namespace std;
     int i = 1;
     bool allpass = true;
+    constexpr GF256Polynomial<4> ZERO;
     for (auto &r : testVectors)
     {
         ReedSolomon<255, 251> rs;
         rs.encode(&r[0], 251);
-        bool equal = memcmp(rs.begin(), &r[251], 4) == 0;
-        allpass &= equal;
-        cout << "test Vector " << i++ << " " << (equal ? "pass" : "fail") << endl;
         auto S = rs.syndrome(r);
+        bool equal = memcmp(rs.begin(), &r[251], 4) == 0;
+        allpass &= equal && S == ZERO;
+        cout << "test Vector " << i++ << " " << (equal ? "pass" : "fail") << endl;
     }
     cout << "---------------" << endl << "Test " << (allpass ? "passed" : "failed") << endl;
 }
