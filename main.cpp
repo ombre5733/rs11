@@ -31,6 +31,7 @@ int main()
         bool equal = memcmp(rs.begin(), &r[251], 4) == 0;
         allpass &= equal;
         cout << "test Vector " << i++ << " " << (equal ? "pass" : "fail") << endl;
+        auto S = rs.syndrome(r);
     }
     cout << "---------------" << endl << "Test " << (allpass ? "passed" : "failed") << endl;
 }

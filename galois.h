@@ -262,11 +262,16 @@ public:
     }
 
     //! Returns the coefficient of a monomial.
-    constexpr
-        GF256Element coeff(std::size_t degree) const noexcept
+    constexpr GF256Element coeff(std::size_t degree) const noexcept
     {
         return degree <= TDegree ? _m_coefficients[degree] : GF256Element();
     }
+
+    GF256Element& coeff(std::size_t degree)
+    {
+        return _m_coefficients[degree];
+    }
+
 protected:
     // The coefficients of the polynomial.
     GF256Element _m_coefficients[TDegree + 1] = { 0, };

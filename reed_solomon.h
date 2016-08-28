@@ -47,6 +47,18 @@ public:
         finish();
     }
 
+    GF256Polynomial<4> syndrome(const std::uint8_t (&rx_message) [M]) const noexcept
+    {
+        GF256Polynomial<4> S;
+        static constexpr uint8_t scale[] = {16,8,4,2};
+        for (auto d : rx_message)
+        {
+            for (int i = 0; i < 4; i++)
+                S.coeff(i) = S.coeff(i) * scale[i] + d;
+        }
+        return S;
+    }
+
     ReedSolomon& operator<< (std::uint8_t datum) noexcept
     {
         *m_scratchIter = datum;
