@@ -141,6 +141,13 @@ public:
             : m_antiLogTable[mod(m_logTable[m_value] + m_logTable[b.m_value])];
     }
 
+    //! Adds \p to this element.
+    GF256Element& operator+=(GF256Element b) noexcept
+    {
+        m_value += b.m_value;
+        return *this;
+    }
+
     constexpr
     GF256Element inverse() const noexcept
     {
@@ -252,10 +259,10 @@ public:
     //}
 
     constexpr
-    GF256Polynomial(const GF256Element(&poly)[TDegree + 1]) noexcept
+    GF256Polynomial(const GF256Element(&coeffs)[TDegree + 1]) noexcept
     {
         using namespace std;
-        copy(begin(poly), end(poly), begin(_m_coefficients));
+        copy(begin(coeffs), end(coeffs), begin(_m_coefficients));
     }
 
     template <std::size_t TDeg>
@@ -313,6 +320,9 @@ public:
         _m_coefficients[0] = 0;
     }
 
+    //! Compares two polynomials.
+    //!
+    //! Returns \p true if this polynomial is equal to \p rhs.
     constexpr
     bool operator==(const GF256Polynomial& rhs) const noexcept
     {
@@ -340,7 +350,7 @@ GF256Polynomial<0> prod<0>()
 }
 
 
-
+inline
 std::ostream& operator<<(std::ostream& str, GF256Element e)
 {
     str << e.value();
@@ -358,4 +368,3 @@ std::ostream& operator<<(std::ostream& str, const GF256Polynomial<TDeg>& p)
     }
     return str;
 }
-
