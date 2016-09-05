@@ -136,6 +136,13 @@ public:
     }
 
     constexpr
+    GF256Element inverse() const noexcept
+    {
+        return m_antiLogTable[255 - m_logTable[m_value]];
+    }
+
+    // TODO: Remove
+    constexpr
         unsigned value() const noexcept
     {
         return m_value;
