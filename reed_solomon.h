@@ -2,48 +2,79 @@
 
 #include "galois.h"
 
-// Polynomial
-// \prod_{i=0}^{?} (x - \alpha^i), \alpha \in GF(2^8)
-template <std::size_t M, std::size_t N>
-class ReedSolomon
+
+namespace detail
 {
-    static_assert(N < M, "");
+
+//! Returns the polynomial \f$ p(x) = prod_{i=0}^N (x - \alpha^i) \f$ with
+//! \f$ alpha = 2 \f$.
+template <std::size_t N>
+constexpr
+GF256Polynomial<N> createReedSolomonGeneratorPolynomial()
+{
+    return createReedSolomonGeneratorPolynomial<N - 1>()
+            * GF256Polynomial<1>({1, GF256Element::pow2(N - 1)});
+}
+
+//! Returns the polynomial \f$ p(x) = 1 \f$.
+template <>
+constexpr
+GF256Polynomial<0> createReedSolomonGeneratorPolynomial()
+{
+    return GF256Polynomial<0>({1});
+}
+
+} // namespace detail
+
+
+//! A Reed-Solomon encoder.
+//!
+//! The Reed-Solomon code has a total number of \p M symbols (the block size),
+//! \p N payload symbols and <tt>(M - N)</tt> parity symbols. The RS code makes
+//! use of 8-bit symbols.
+//!
+//! The class holds internal state needed for encoding messages.
+template <std::size_t M, std::size_t N>
+class ReedSolomonEncoder
+{
+    static_assert(M <= 255, "Only 255 symbols are supported");
+    static_assert(N < M, "The number of payload symbols must be smaller than the total number of symbols");
+
     static constexpr std::size_t numParitySyms = M - N;
 
 public:
     constexpr
-    ReedSolomon() noexcept
-        : m_scratchIter(&m_scratch[0]),
-          m_finished(false)
+    ReedSolomonEncoder() noexcept
+        : m_polynomial{detail::createReedSolomonGeneratorPolynomial<numParitySyms>()},
+          m_scratchIter{&m_scratch[0]},
+          m_finished{false}
     {
-        std::fill(std::begin(m_scratch), std::end(m_scratch), GF256Element());
     }
 
-    ReedSolomon(const ReedSolomon&) = delete;
-    ReedSolomon& operator=(const ReedSolomon&) = delete;
+    ReedSolomonEncoder(const ReedSolomonEncoder&) = delete;
+    ReedSolomonEncoder& operator=(const ReedSolomonEncoder&) = delete;
 
-    void finish() noexcept
-    {
-        while (m_scratchIter != &m_scratch[numParitySyms + 1])
-            *m_scratchIter++ = 0;
-        for (std::size_t count = 0; count < numParitySyms; ++count)
-            polyLongDiv();
-    }
-
-    void encode(const std::uint8_t* message, std::size_t length) noexcept
+    //! Encodes a message.
+    //!
+    //! Encodes the given \p message consisting of \p length bytes.
+    void encode(std::uint8_t* message, std::size_t length) noexcept
     {
         encodePart(message, length);
         finish();
     }
 
-    void encodePart(const std::uint8_t* message, std::size_t length) noexcept
+    void encodePart(std::uint8_t* message, std::size_t length) noexcept
     {
+        // TODO: If length exceeds the payload size, throw an exception.
+
+        // Fill up the scratch space except the last slot.
         while (m_scratchIter != &m_scratch[numParitySyms] && length)
         {
             *m_scratchIter++ = *message++;
             --length;
         }
 
+        // Perform a long division for every new element.
         while (length)
         {
             *m_scratchIter = *message++;
@@ -52,19 +83,16 @@ public:
         }
     }
 
-    GF256Polynomial<4> syndrome(const std::uint8_t (&rx_message) [M]) const noexcept
+    //! Finishes encoding.
+    void finish() noexcept
     {
-        GF256Polynomial<4> S;
-        static constexpr uint8_t scale[] = {16,8,4,2};
-        for (auto d : rx_message)
-        {
-            for (int i = 0; i < 4; i++)
-                S.coeff(i) = S.coeff(i) * scale[i] + d;
-        }
-        return S;
+        while (m_scratchIter < &m_scratch[numParitySyms + 1])
+            *m_scratchIter++ = 0;
+        for (std::size_t count = 0; count < numParitySyms; ++count)
+            polyLongDiv();
     }
 
-    ReedSolomon& operator<<(std::uint8_t datum) noexcept
+    ReedSolomonEncoder& operator<<(std::uint8_t datum) noexcept
     {
         *m_scratchIter = datum;
         if (m_scratchIter == &m_scratch[numParitySyms])
@@ -87,6 +115,15 @@ public:
         return reinterpret_cast<std::uint8_t*>(&m_scratch[numParitySyms]);
     }
 
+    //! Returns the parity symbols.
+    void paritySymbols() const noexcept;
+
+    //! Returns the number of parity symbols.
+    std::size_t numParitySymbols() const noexcept
+    {
+        return numParitySyms;
+    }
+
 private:
     // Performs a polynomial long division.
     //
@@ -98,14 +135,18 @@ private:
         GF256Element quotient = m_scratch[0];
         // When subtracting the intermediate result, the first term is
         // zeroed. Shift the lower order terms into place.
-        for (std::size_t idx = 1; idx <= numParitySyms; ++idx)
+        for (size_t idx = 1; idx <= numParitySyms; ++idx)
             m_scratch[idx - 1] = m_scratch[idx] - m_polynomial.coeff(idx) * quotient;
     }
-protected:
-    // RS(255,251) polynomial (285 dec)
-    const GF256Polynomial<4> m_polynomial = { { 1, 30, 216, 231, 116 } };
-    GF256Element m_scratch[numParitySyms + 1] = { 0, };
+
+    //! The polynomial for Reed-Solomon encoding/decoding.
+    GF256Polynomial<numParitySyms> m_polynomial;
+
+    //! A scratch space to perform the polynomial long division.
+    GF256Element m_scratch[numParitySyms + 1];
+    //! An iterator over the scratch space.
     GF256Element* m_scratchIter;
+
     bool m_finished;
 };
 
