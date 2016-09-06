@@ -152,30 +152,162 @@ private:
 
 
 
-template <std::size_t M, std::size_t N>
-class Decoder
+class Error
 {
-    static_assert(N < M, "");
-    static constexpr std::size_t numParitySyms = M - N;
-
 public:
-    Decoder()
+    std::size_t location() const noexcept
     {
+        return m_location;
     }
 
-    Decoder(const Decoder&) = delete;
-    Decoder& operator=(const Decoder&) = delete;
-
-    Decoder& operator<<(std::uint8_t datum) noexcept
+    std::uint8_t correct(std::uint8_t datum) const noexcept
     {
-        return *this;
+        return 0; // TODO
     }
 
 private:
-    //! The syndromes of the encoded data.
+    std::size_t m_location;
+    GF256Element m_magnitude;
+};
+
+template <std::size_t M, std::size_t N>
+class ReedSolomonDecoder
+{
+    static_assert(M <= 255, "Only 255 symbols are supported");
+    static_assert(N < M, "The number of payload symbols must be smaller than the total number of symbols");
+
+    static constexpr std::size_t numParitySyms = M - N;
+
+public:
+    ReedSolomonDecoder()
+        : m_size(0)
+    {
+    }
+
+    ReedSolomonDecoder(const ReedSolomonDecoder&) = delete;
+    ReedSolomonDecoder& operator=(const ReedSolomonDecoder&) = delete;
+
+    ReedSolomonDecoder& operator<<(std::uint8_t datum) noexcept
+    {
+        ++m_size;
+
+        // To compute the syndromes, the encoded message must be evaluated
+        // at the roots of the generator polynomial, i.e. at
+        // \alpha^i, i = 0 ... N, with \alpha = 2. If we had no errors in
+        // the encoded message, the syndromes would be all zero.
+        for (size_t idx = 0; idx < numParitySyms; ++idx)
+        {
+            // TODO: Speed up with
+            // if m_syndrome[idx] == 0: m_syndrome[idx] = datum;
+            m_syndromes[idx] = m_syndromes[idx] * GF256Element::pow2(idx) + GF256Element(datum);
+        }
+
+        return *this;
+    }
+
+    void bm()
+    {
+        // Berlekamp-Massey algorithm
+        for (unsigned idx = 0; idx <= numParitySyms; ++idx)
+            m_errorLocator[idx] = m_B[idx] = 0;
+        m_errorLocator[0] = m_B[0] = GF256Element(1);
+
+        std::size_t numErrors = 0;
+        for (std::size_t iteration = 0; iteration < numParitySyms; ++iteration)
+        {
+            GF256Element discrepancy;
+            for (std::size_t idx = 0; idx <= iteration; ++idx)
+                discrepancy = discrepancy + m_errorLocator[idx] * m_syndromes[iteration - idx]; // TODO: +=
+
+            cout << "iter = " << iteration << "   delta = " << discrepancy.value() << "\n";
+
+            if (discrepancy.value() == 0) // TODO: operator==
+            {
+                // No discrepancy.
+                // B(x) <- x * B(x)
+                m_B.timesX();
+            }
+            else
+            {
+                // Lambda(x) <- Lambda(x) - Delta * x * B(x)
+                m_temp[0] = m_errorLocator[0];
+                for (size_t idx = 0; idx < numParitySyms; ++idx)
+                   m_temp[idx + 1] = m_errorLocator[idx + 1] - discrepancy * m_B[idx];
+
+                if (2 * numErrors <= iteration)
+                {
+                    numErrors = iteration + 1 - numErrors;
+                    // B(x) <- Delta^{-1} Lambda(x)
+                    discrepancy = discrepancy.inv();
+                    for (size_t idx = 0; idx <= numParitySyms; ++idx)
+                        m_B[idx] = discrepancy * m_errorLocator[idx];
+                }
+                else
+                {
+                    // B(x) <- x * B(x)
+                    m_B.timesX();
+                }
+
+                m_errorLocator = m_temp;
+            }
+
+            cout << "   m_errorLocator ";
+            for (auto coeff : m_errorLocator._m_coefficients)
+                cout << " " << coeff.value();
+            cout << "\n";
+
+            cout << "   m_errorLocator " << m_errorLocator << "\n";
+        }
+
+
+        // Find the roots of the error locator polynomial. The roots are the
+        // inverse of the error locations.
+        unsigned numRoots = 0;
+        auto errorLocatorDegree = m_errorLocator.degree();
+        for (unsigned idx = 1; idx <= 255; ++idx)
+        {
+            if (!m_errorLocator(GF256Element::pow2(idx), errorLocatorDegree))
+            {
+                cout << "   - Root: i = " << idx
+                     << "   (" << 255 - idx << ")"
+                     << "   " << GF256Element::pow2(idx).value()
+                     << "   " << GF256Element::pow2(idx).inv().value() << endl;
+                cout << " DBG " << m_errorLocator(0).value() << endl;
+
+                auto invIndex = 255 - idx;
+                if (m_size - 1 < invIndex)
+                    return; // TODO: unable to correct the error
+
+                cout << "Error at " << m_size - 1 - invIndex << "\n";
+                if (++numRoots == errorLocatorDegree)
+                    break;
+            }
+        }
+
+        if (numRoots != errorLocatorDegree)
+            return; // TODO: unable to correct the error
+
+        // TODO: Applie Forney to get the error magnitudes.
+    }
+
+    bool hasError() const noexcept
+    {
+        for (auto syn : m_syndromes)
+            if (syn.value() != 0)
+                return true;
+        return false;
+    }
+
+public:
+    //! The syndromes.
     GF256Element m_syndromes[numParitySyms];
+
     //! The error locator polynomial.
     GF256Polynomial<numParitySyms> m_errorLocator;
-    //! A scratch polynomial for the Berlekamp-Massey algorithm.
+    //! A scratch polynomial needed to update the error locator polynomial.
     GF256Polynomial<numParitySyms> m_temp;
+
+    GF256Polynomial<numParitySyms> m_B;
+
+    std::size_t m_size;
 };
