@@ -86,9 +86,9 @@ IncrArray createLogTable(const IncrArray& powers, std::size_t idx, const IncrArr
 //! the form \f$ p(x) = \sum_{i=0}^7 a_i x^i \f$, with \f$ a_i \in GF(2) \f$.
 //! Since \f$ a_i \in {0,1} \f$, we represent an element of GF(2^8) as
 //! 8-bit unsigned integer. For example, the polynomial \f$ x^5 + x^2 + x^1 \f$
-//! has the binary representation 0b00100110.
+//! has the binary representation <tt>0b00100110</tt>.
 //!
-//! Let \alpha denote one primitive element of GF(2^8). The powers
+//! Let \p alpha denote one primitive element of GF(2^8). The powers
 //! \f$ \alpha^i, i = 0, ..., 254 \f$ generate all non-zero elements of
 //! GF(2^8).
 // \alpha is defined as root of an irreducible polynomial with degree 8, e.g.
@@ -126,10 +126,11 @@ public:
     constexpr
     GF256Element operator-(GF256Element b) const noexcept
     {
+        // Subtraction in GF(2) is just an addition.
         return m_value ^ b.m_value;
     }
 
-    //! Computes the product between two elements from GF(2^8).
+    //! Computes the product of two elements from GF(2^8).
     //!
     //! Multiplies this element with \p b and returns the product.
     constexpr
@@ -137,8 +138,8 @@ public:
     {
         // Exploit the relation a * b = g^{log_g(a) + log_g(b)}
         return (m_value == 0 || b.m_value == 0)
-            ? 0
-            : m_antiLogTable[mod(m_logTable[m_value] + m_logTable[b.m_value])];
+               ? 0
+               : m_antiLogTable[mod(m_logTable[m_value] + m_logTable[b.m_value])];
     }
 
     //! Adds \p to this element.
@@ -167,26 +168,19 @@ public:
         return m_value;
     }
 
-    //    //! Returns the 2 raised to the power \p p.
-    //    //!
-    //    //! Returns the GF(2^8) element 2^p.
-    //    static GF256Element exp(unsigned p)
-    //    {
-    //        return m_antiLogTable[trueMod(p)];
-    //    }
-
-    //! Returns \p true, if this element is equal to \p b.
-    constexpr
-    bool operator==(GF256Element b) const noexcept
-    {
-        return m_value == b.m_value;
-    }
-
-    //! Returns \p true, if this element is non-zero.
-    constexpr explicit
+    explicit
     operator bool() const noexcept
     {
         return m_value != 0;
+    }
+    
+    //! Returns 2 raised to the power \p p.
+    //!
+    //! Returns the GF(2^8) element <tt>2^p</tt>.
+    static constexpr
+    GF256Element pow2(unsigned p)
+    {
+        return m_antiLogTable[p % 255];
     }
 
 private:
@@ -225,11 +219,11 @@ class GF256Polynomial
 {
     template <std::size_t TDeg, std::size_t... TIndices>
     constexpr
-    GF256Polynomial<sizeof...(TIndices) - 1> doAdd(
-        const GF256Polynomial<TDeg>& b,
-        std::index_sequence<TIndices...>) const noexcept
+    GF256Polynomial<sizeof...(TIndices) - 1>
+    doAdd(const GF256Polynomial<TDeg>& b,
+          index_sequence<TIndices...>) const noexcept
     {
-        return{ (coeff(TIndices) + b.coeff(TIndices))... };
+        return { (coeff(TIndices) + b.coeff(TIndices))... };
     }
 
     template <std::size_t TDeg>
@@ -238,25 +232,25 @@ class GF256Polynomial
                             std::size_t degA, std::size_t degB) const noexcept
     {
         return degA == 0 ? coeff(degA) * b.coeff(degB)
-            : coeff(degA) * b.coeff(degB)
-            + doConvPart(b, degA - 1, degB + 1);
+                         : coeff(degA) * b.coeff(degB)
+                           + doConvPart(b, degA - 1, degB + 1);
     }
 
     template <std::size_t TDeg, std::size_t... TIndices>
     constexpr
-    GF256Polynomial<sizeof...(TIndices) - 1> doMul(
-        const GF256Polynomial<TDeg>& b,
-        std::index_sequence<TIndices...>) const noexcept
+    GF256Polynomial<sizeof...(TIndices) - 1>
+    doMul(const GF256Polynomial<TDeg>& b,
+          index_sequence<TIndices...>) const noexcept
     {
-        return{ doConvPart(b, TIndices, 0)... };
+        return { doConvPart(b, TIndices, 0)... };
     }
 
 public:
-    //constexpr
-    //GF256Polynomial() noexcept
-    //    : _m_coefficients{}
-    //{
-    //}
+//    constexpr
+//    GF256Polynomial() noexcept
+//        : _m_coefficients{}
+//    {
+//    }
 
     constexpr
     GF256Polynomial(const GF256Element(&coeffs)[TDegree + 1]) noexcept
@@ -267,7 +261,8 @@ public:
 
     template <std::size_t TDeg>
     constexpr
-    GF256Polynomial<cmax(TDegree, TDeg)> operator+(const GF256Polynomial<TDeg>& b) const noexcept
+    auto operator+(const GF256Polynomial<TDeg>& b) const noexcept
+        -> GF256Polynomial<cmax(TDegree ,TDeg)>
     {
         return doAdd(b, std::make_index_sequence<cmax(TDegree, TDeg) + 1>());
     }
@@ -293,8 +288,17 @@ public:
     //! Evaluates the polynomial.
     GF256Element operator()(GF256Element x) const noexcept
     {
-        GF256Element sum{ _m_coefficients[TDegree] };
+        GF256Element sum{_m_coefficients[TDegree]};
         for (std::size_t deg = TDegree; deg > 0; --deg)
+            sum = sum * x + _m_coefficients[deg - 1];
+        return sum;
+    }
+
+    //! Evaluates the polynomial of a certain degree.
+    GF256Element operator()(GF256Element x, std::size_t degree) const noexcept
+    {
+        GF256Element sum{_m_coefficients[degree]};
+        for (std::size_t deg = degree; deg > 0; --deg)
             sum = sum * x + _m_coefficients[deg - 1];
         return sum;
     }
@@ -306,18 +310,28 @@ public:
         return degree <= TDegree ? _m_coefficients[degree] : GF256Element();
     }
 
-    GF256Element& coeff(std::size_t degree)
+    //! Returns the coefficient of a monomial.
+    GF256Element& operator[](std::size_t degree) noexcept
     {
         return _m_coefficients[degree];
     }
 
-    //! Multiplies this polynomial inplace with the polynomial \f$ p(x) = x \f$.
+    //! Multiplies the polynomial inplace with the polynomial \f$ p(x) = x \f$.
     void timesX() noexcept
     {
         // Shift the coefficients: [a, b, c, d] -> [d, a, b, c].
         std::rotate(&_m_coefficients[0], &_m_coefficients[0] + TDegree,
                     &_m_coefficients[0] + TDegree + 1);
         _m_coefficients[0] = 0;
+    }
+
+    //! Returns the degree of the polynomial.
+    std::size_t degree() const noexcept
+    {
+        for (std::size_t deg = TDegree; deg > 0; --deg)
+            if (_m_coefficients[deg])
+                return deg;
+        return 0;
     }
 
     //! Compares two polynomials.
@@ -330,24 +344,13 @@ public:
         return equal(begin(_m_coefficients), end(_m_coefficients), begin(rhs._m_coefficients));
     }
 
-protected:
+
+
+
     // The coefficients of the polynomial.
-    GF256Element _m_coefficients[TDegree + 1] = { 0, };
+    GF256Element _m_coefficients[TDegree + 1];
 };
 
-template <std::size_t N>
-constexpr
-GF256Polynomial<N> prod()
-{
-    return GF256Polynomial<1>({ 1, N }) * prod<N - 1>();
-}
-
-template <>
-constexpr
-GF256Polynomial<0> prod<0>()
-{
-    return GF256Polynomial<0>({ 1 });
-}
 
 
 inline
