@@ -300,6 +300,9 @@ public:
     }
 
     //! Returns the coefficient of a monomial.
+    //!
+    //! Returns the coefficient of the monomial of given \p degree. Zero is
+    //! returned if \p degree is higher than the degree of the polynomial.
     constexpr
     GF256Element coeff(std::size_t degree) const noexcept
     {
@@ -498,7 +501,8 @@ public:
         return 0; // TODO
     }
 
-private:
+//private:
+    std::uint8_t m_root;
     std::size_t m_location;
     GF256Element m_magnitude;
 };
@@ -601,7 +605,7 @@ public:
 
 
         // Find the roots of the error locator polynomial. The roots are the
-        // inverse of the error locations.
+        // inverses of the error locations.
         unsigned numRoots = 0;
         auto errorLocatorDegree = m_errorLocator.degree();
         for (unsigned idx = 1; idx <= 255; ++idx)
@@ -619,6 +623,9 @@ public:
                     return; // TODO: unable to correct the error
 
                 cout << "Error at " << m_size - 1 - invIndex << "\n";
+
+                m_errors[numRoots].m_root = idx;
+                m_errors[numRoots].m_location = m_size - 1 - invIndex;
                 if (++numRoots == errorLocatorDegree)
                     break;
             }
@@ -626,6 +633,28 @@ public:
 
         if (numRoots != errorLocatorDegree)
             return; // TODO: unable to correct the error
+
+        // Compute the error evaluator polynomial:
+        // omega(x) = s(x) * lambda(x) (mod x^numParitySyms).
+        // Use a specially crafted multiplication which omits the higher order
+        // terms as they would vanish after the modulo operation.
+        for (unsigned idx = 0; idx < errorLocatorDegree; ++idx)
+        {
+            GF256Element sum(0);
+            for (unsigned k = 0; k <= idx; ++k)
+                sum = sum + m_syndromes[k] * m_errorLocator.coeff(idx - k); // TODO: +=
+            m_errorEvaluator[idx] = sum;
+        }
+
+        // Apply Forneys algorithm to compute the error magnitudes.
+        for (unsigned errorIdx = 0; errorIdx < numRoots; ++errorIdx)
+        {
+            cout << "eval at " << GF256Element::pow2(m_errors[errorIdx].m_root).value() << endl;
+            GF256Element numerator = m_errorEvaluator(GF256Element::pow2(m_errors[errorIdx].m_root));
+            cout << "numerology " << numerator.value() << endl;
+            GF256Element denominator(0);
+
+        }
     }
 
     bool hasError() const noexcept
@@ -642,10 +671,15 @@ public:
 
     //! The error locator polynomial.
     GF256Polynomial<numParitySyms> m_errorLocator;
+
+    GF256Polynomial<numParitySyms> m_errorEvaluator;
+
     //! A scratch polynomial needed to update the error locator polynomial.
     GF256Polynomial<numParitySyms> m_temp;
 
     GF256Polynomial<numParitySyms> m_B;
+
+    Error m_errors[numParitySyms];
 
     std::size_t m_size;
 };
@@ -764,6 +798,14 @@ int main()
 
     cout << "Error locator: ";
     for (auto iter : rsDec.m_errorLocator._m_coefficients)
+    {
+        cout << std::dec << iter.value() << " ";
+    }
+    cout << endl << endl;
+
+
+    cout << "Error evaluator: ";
+    for (auto iter : rsDec.m_errorEvaluator._m_coefficients)
     {
         cout << std::dec << iter.value() << " ";
     }
