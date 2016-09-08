@@ -131,6 +131,12 @@ public:
         return m_value ^ b.m_value;
     }
 
+    GF256Element& operator+=(GF256Element b) noexcept
+    {
+        m_value ^= b.m_value;
+        return *this;
+    }
+
     //! Computes the difference between two elements from GF(2^8).
     //!
     //! Subtracts \p b from this element and returns the difference.
@@ -212,6 +218,12 @@ T const& cmax(T const& a, T const& b)
 {
     return a > b ? a : b;
 }
+
+struct derivative_t
+{
+};
+
+constexpr derivative_t derivative;
 
 //! A polynomial with coefficients in GF(2^8).
 //!
@@ -299,6 +311,42 @@ public:
         return sum;
     }
 
+    GF256Element operator()(GF256Element x, derivative_t) const noexcept
+    {
+        if (TDegree < 1)
+            return GF256Element(0);
+
+        {
+            GF256Polynomial tmp;
+            for (unsigned i = 0; i < TDegree; i += 2)
+                tmp[i] = _m_coefficients[i + 1];
+            cout << "> > > > derivative should be " << tmp(x).value() << endl;
+        }
+        // 3 + 4 x + 5 x^2
+        // 4 + 5 * 2 * x
+
+        // The even powers of the polynomial lead to the derivative
+        // (p * x^n)' = n * p * x^(n-1), with n even. But we can write this as
+        // n/2 * p * x^(n-1) + n/2 * p * x^(n-1) and so it is equal to
+        // zero (because we are in GF(2) and addition is a XOR).
+        //
+        // The odd powers result in n * p * x^(n-1), with n odd. This reduces to
+        // (n-1)/2 * p * x^(n-1) + (n-1)/2 * p * x^(n-1) + p * x^(n-1) =
+        // p * x^(n-1). So only odd powers survive.
+        GF256Element x2 = x * x;
+        GF256Element sum(0);
+        for (int even = (TDegree - 1) & ~1; even >= 0; even -= 2)
+            sum = sum * x2 + _m_coefficients[even + 1];
+        cout << "> > > > derivative is " << sum.value() << endl;
+
+        sum = GF256Element(0);
+        for (int idx = TDegree; idx >= 1; idx -= 1)
+            sum = sum * x + ((idx % 2 == 0) ? GF256Element(0) : _m_coefficients[idx]);
+        cout << "> > > > derivative chk " << sum.value() << endl;
+
+        return sum;
+    }
+
     //! Returns the coefficient of a monomial.
     //!
     //! Returns the coefficient of the monomial of given \p degree. Zero is
@@ -363,6 +411,13 @@ GF256Polynomial<0> createReedSolomonGeneratorPolynomial()
 } // namespace detail
 
 
+template <std::size_t M, std::size_t N>
+class ReedSolomonEncoder;
+
+template <std::size_t M, std::size_t N>
+class ReedSolomonDecoder;
+
+
 //! A Reed-Solomon encoder.
 //!
 //! The Reed-Solomon code has a total number of \p M symbols (the block size),
@@ -379,6 +434,8 @@ class ReedSolomonEncoder
     static constexpr std::size_t numParitySyms = M - N;
 
 public:
+    using decoder_type = ReedSolomonDecoder<M, N>;
+
     constexpr
     ReedSolomonEncoder() noexcept
         : m_polynomial{detail::createReedSolomonGeneratorPolynomial<numParitySyms>()},
@@ -507,6 +564,33 @@ public:
     GF256Element m_magnitude;
 };
 
+class ErrorRange
+{
+public:
+    ErrorRange(Error* begin, Error* end)
+        : m_begin(begin),
+          m_end(end)
+    {
+    }
+
+    ErrorRange(const ErrorRange&) = default;
+    ErrorRange& operator=(const ErrorRange&) = default;
+
+    const Error* begin() const noexcept
+    {
+        return m_begin;
+    }
+
+    const Error* end() const noexcept
+    {
+        return m_end;
+    }
+
+private:
+    Error* m_begin;
+    Error* m_end;
+};
+
 enum class DecoderResult
 {
     Correct,
@@ -523,6 +607,8 @@ class ReedSolomonDecoder
     static constexpr std::size_t numParitySyms = M - N;
 
 public:
+    using encoder_type = ReedSolomonEncoder<M, N>;
+
     ReedSolomonDecoder()
         : m_size(0)
     {
@@ -561,7 +647,7 @@ public:
         {
             GF256Element discrepancy;
             for (std::size_t idx = 0; idx <= iteration; ++idx)
-                discrepancy = discrepancy + m_errorLocator[idx] * m_syndromes[iteration - idx]; // TODO: +=
+                discrepancy += m_errorLocator[idx] * m_syndromes[iteration - idx];
 
             cout << "iter = " << iteration << "   delta = " << discrepancy.value() << "\n";
 
@@ -606,16 +692,17 @@ public:
 
         // Find the roots of the error locator polynomial. The roots are the
         // inverses of the error locations.
-        unsigned numRoots = 0;
+        unsigned m_numErrors = 0;
         auto errorLocatorDegree = m_errorLocator.degree();
         for (unsigned idx = 1; idx <= 255; ++idx)
         {
-            if (!m_errorLocator(GF256Element::pow2(idx), errorLocatorDegree))
+            auto x = GF256Element::pow2(idx);
+            if (!m_errorLocator(x, errorLocatorDegree))
             {
                 cout << "   - Root: i = " << idx
                      << "   (" << 255 - idx << ")"
-                     << "   " << GF256Element::pow2(idx).value()
-                     << "   " << GF256Element::pow2(idx).inverse().value() << endl;
+                     << "   " << x.value()
+                     << "   " << x.inverse().value() << endl;
                 cout << " DBG " << m_errorLocator(0).value() << endl;
 
                 auto invIndex = 255 - idx;
@@ -624,36 +711,53 @@ public:
 
                 cout << "Error at " << m_size - 1 - invIndex << "\n";
 
-                m_errors[numRoots].m_root = idx;
-                m_errors[numRoots].m_location = m_size - 1 - invIndex;
-                if (++numRoots == errorLocatorDegree)
+                m_errors[m_numErrors].m_root = x.value();
+                m_errors[m_numErrors].m_location = m_size - 1 - invIndex;
+                if (++m_numErrors == errorLocatorDegree)
                     break;
             }
         }
 
-        if (numRoots != errorLocatorDegree)
+        if (m_numErrors != errorLocatorDegree)
             return; // TODO: unable to correct the error
 
         // Compute the error evaluator polynomial:
         // omega(x) = s(x) * lambda(x) (mod x^numParitySyms).
         // Use a specially crafted multiplication which omits the higher order
-        // terms as they would vanish after the modulo operation.
+        // terms as they will vanish after the modulo operation.
         for (unsigned idx = 0; idx < errorLocatorDegree; ++idx)
         {
             GF256Element sum(0);
             for (unsigned k = 0; k <= idx; ++k)
-                sum = sum + m_syndromes[k] * m_errorLocator.coeff(idx - k); // TODO: +=
+                sum += m_syndromes[k] * m_errorLocator.coeff(idx - k);
             m_errorEvaluator[idx] = sum;
         }
 
-        // Apply Forneys algorithm to compute the error magnitudes.
-        for (unsigned errorIdx = 0; errorIdx < numRoots; ++errorIdx)
+        // Apply Forney's algorithm to compute the error magnitudes.
+        for (unsigned errorIdx = 0; errorIdx < m_numErrors; ++errorIdx)
         {
-            cout << "eval at " << GF256Element::pow2(m_errors[errorIdx].m_root).value() << endl;
-            GF256Element numerator = m_errorEvaluator(GF256Element::pow2(m_errors[errorIdx].m_root));
-            cout << "numerology " << numerator.value() << endl;
-            GF256Element denominator(0);
+            cout << "\n";
+            cout << "---- Forney " << errorIdx << endl;
 
+            GF256Element Xi = m_errors[errorIdx].m_root;
+
+            cout << "eval at " << Xi.value() << endl;
+            GF256Element numerator = m_errorEvaluator(Xi);
+            cout << "numerology " << numerator.value() << endl;
+
+            // The denominator is the formal derivative of the error locator
+            // polynomial evaluated at the root.
+            GF256Element denominator = m_errorLocator(Xi, derivative);
+            cout << "denominator " << denominator.value() << endl;
+
+            if (!denominator)
+                return; // TODO: unable to correct the error
+
+            cout << "quot: " << (numerator * denominator.inverse()).value() << endl;
+            cout << "??? " << (numerator * (denominator * Xi).inverse()).value() << endl;
+            cout << "----\n";
+
+            m_errors[errorIdx].m_magnitude = (numerator * (denominator * Xi).inverse()).value();
         }
     }
 
@@ -756,17 +860,21 @@ int main()
 
     cout << GF256Polynomial<2>() << endl;
     cout << GF256Polynomial<2>({1,0,0}) << endl;
-    cout << pa << endl;
-    cout << pb << endl;
+    cout << "pa(x) = " << pa << endl;
+    cout << "pb(x) = " << pb << endl;
     cout << (pa + pb) << endl;
     cout << (pa * pb) << endl;
+
+    cout << "pa'(2) = " << pa(2, derivative) << endl;
+    cout << "pb(2) = " << pb(2) << endl;
+    cout << "pb'(2) = " << pb(2, derivative) << endl;
 
     auto RSgen = detail::createReedSolomonGeneratorPolynomial<19>();
     cout << "RSgen:\n";
     cout << RSgen << endl;
 
     cout << "\n\nReed-Solomon encoding" << endl;
-    ReedSolomonEncoder<255, 251> rsEnc;
+    ReedSolomonEncoder<255, 245> rsEnc;
     std::vector<std::uint8_t> data({0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x57, 0x6f, 0x72, 0x6c, 0x64});
     for (auto b : data)
         rsEnc << b;
@@ -782,10 +890,10 @@ int main()
     cout << endl << endl;
 
     // Introduce errors.
-    for (int i = 1; i <= 1; ++i)
+    for (int i = 1; i <= 4; ++i)
         encData[i] = 'a';
     cout << "\n\nReed-Solomon decoding" << endl;
-    ReedSolomonDecoder<255, 251> rsDec;
+    ReedSolomonDecoder<255, 245> rsDec;
     for (auto d : encData)
         rsDec << d;
     rsDec.bm();
@@ -810,4 +918,8 @@ int main()
         cout << std::dec << iter.value() << " ";
     }
     cout << endl << endl;
+
+
+    GF256Polynomial<6> pm{3, 4, 5, 6, 7, 8, 9};
+    cout << pm(2, derivative) << endl;
 }
