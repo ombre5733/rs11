@@ -39,6 +39,8 @@ int main()
         ReedSolomon<255, 251> rs;
         rs.encode(&r[0], 251);
         auto S = rs.syndrome(r);
+        auto LO = rs.RiBM(S);
+
         bool equal = memcmp(rs.begin(), &r[251], 4) == 0;
         allpass &= equal && S == ZERO;
         cout << "test Vector " << i++ << " " << (equal ? "pass" : "fail") << endl;
