@@ -1,6 +1,7 @@
 #pragma once
 
 #include "galois.h"
+#include "gsl/span"
 
 template <std::size_t M, std::size_t N>
 class ReedSolomonEncoder;
@@ -51,22 +52,37 @@ public:
         encodePart(message, length);
         finish();
     }
+    
+    void encode(gsl::span<const uint8_t> message) noexcept
+    {
+        encodePart(message);
+        finish();
+    }
 
     void encodePart(std::uint8_t* message, std::size_t length) noexcept
     {
+        encodePart({ message, length });
+    }
+        
+    void encodePart(gsl::span<const uint8_t> message) noexcept        
+    {
         // TODO: If length exceeds the payload size, throw an exception.
-
+        
+        // not the most beautifull way of dealing with span's ... but for the time being 
+        size_t length = message.size();
+        const uint8_t* pData = message.data();
+        
         // Fill up the scratch space except the last slot.
         while (m_scratchIter != &m_scratch[numParitySyms] && length)
         {
-            *m_scratchIter++ = *message++;
+            *m_scratchIter++ = *pData++;
             --length;
         }
 
         // Perform a long division for every new element.
         while (length)
         {
-            *m_scratchIter = *message++;
+            *m_scratchIter = *pData++;
             --length;
             polyLongDiv();
         }
