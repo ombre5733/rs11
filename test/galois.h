@@ -5,7 +5,7 @@
 #include <utility>
 #include <cstdint>
 
-#define MAX   256
+#define MAX_IDX_SEQ   256
 
 constexpr std::uint8_t reduction_poly = 0x1d;
 
@@ -37,12 +37,12 @@ namespace detail
     public:
         constexpr IncrArray modified(std::size_t idx, int value) const
         {
-            return doModify(idx, value, std::make_index_sequence<MAX>());
+            return doModify(idx, value, std::make_index_sequence<MAX_IDX_SEQ>());
         }
 
         constexpr std::size_t size() const
         {
-            return MAX;
+            return MAX_IDX_SEQ;
         }
 
         constexpr std::uint8_t operator[](std::size_t idx) const
@@ -50,12 +50,12 @@ namespace detail
             return m_data[idx];
         }
 
-        std::uint8_t m_data[MAX];
+        std::uint8_t m_data[MAX_IDX_SEQ];
     };
 
     constexpr auto createPowerTable(std::size_t idx, const IncrArray& temp) -> IncrArray
     {
-        return idx == MAX ? temp
+        return idx == MAX_IDX_SEQ ? temp
             : createPowerTable(
                 idx + 1,
                 temp.modified(idx, idx == 0 ? 1 : nextPower(temp[idx - 1])));
@@ -63,7 +63,7 @@ namespace detail
 
     constexpr IncrArray createLogTable(const IncrArray& powers, std::size_t idx, const IncrArray& temp)
     {
-        return idx == MAX ? temp
+        return idx == MAX_IDX_SEQ ? temp
             : createLogTable(
                 powers, idx + 1,
                 temp.modified(powers[idx], powers[idx] == 1 ? 0 : int(idx)));
@@ -236,21 +236,21 @@ public:
     template <std::size_t TDeg>
     constexpr auto operator+(const GF256Polynomial<TDeg>& b) const noexcept -> GF256Polynomial<cmax(TDegree, TDeg)>
     {
-        return doAdd(b, make_index_sequence<cmax(TDegree, TDeg) + 1>());
+        return doAdd(b, std::make_index_sequence<cmax(TDegree, TDeg) + 1>());
     }
 
     template <std::size_t TDeg>
     constexpr auto operator-(const GF256Polynomial<TDeg>& b) const noexcept -> GF256Polynomial<cmax(TDegree, TDeg)>
     {
         // Subtraction in GF(2^8) equals addition.
-        return doAdd(b, make_index_sequence<cmax(TDegree, TDeg) + 1>());
+        return doAdd(b, std::make_index_sequence<cmax(TDegree, TDeg) + 1>());
     }
 
     //! Returns the product of two polynomials.
     template <std::size_t TDeg>
     constexpr auto operator*(const GF256Polynomial<TDeg>& b) const noexcept -> GF256Polynomial<TDegree + TDeg>
     {
-        return doMul(b, make_index_sequence<TDegree + TDeg + 1>());
+        return doMul(b, std::make_index_sequence<TDegree + TDeg + 1>());
     }
 
     //! Evaluates the polynomial.
@@ -280,7 +280,7 @@ public:
             GF256Polynomial tmp;
             for (unsigned i = 0; i < TDegree; i += 2)
                 tmp[i] = _m_coefficients[i + 1];
-            cout << "> > > > derivative should be " << tmp(x).value() << endl;
+            //cout << "> > > > derivative should be " << tmp(x).value() << endl;
         }
         // 3 + 4 x + 5 x^2
         // 4 + 5 * 2 * x
@@ -297,12 +297,12 @@ public:
         GF256Element sum(0);
         for (int even = (TDegree - 1) & ~1; even >= 0; even -= 2)
             sum = sum * x2 + _m_coefficients[even + 1];
-        cout << "> > > > derivative is " << sum.value() << endl;
+        //cout << "> > > > derivative is " << sum.value() << endl;
 
         sum = GF256Element(0);
         for (int idx = TDegree; idx >= 1; idx -= 1)
             sum = sum * x + ((idx % 2 == 0) ? GF256Element(0) : _m_coefficients[idx]);
-        cout << "> > > > derivative chk " << sum.value() << endl;
+        //cout << "> > > > derivative chk " << sum.value() << endl;
 
         return sum;
     }

@@ -245,7 +245,7 @@ public:
             for (std::size_t idx = 0; idx <= iteration; ++idx)
                 discrepancy += m_errorLocator[idx] * m_syndromes[iteration - idx];
 
-            cout << "iter = " << iteration << "   delta = " << discrepancy.value() << "\n";
+            //cout << "iter = " << iteration << "   delta = " << discrepancy.value() << "\n";
 
             if (discrepancy.value() == 0) // TODO: operator==
             {
@@ -277,12 +277,12 @@ public:
                 m_errorLocator = m_temp;
             }
 
-            cout << "   m_errorLocator ";
-            for (auto coeff : m_errorLocator._m_coefficients)
-                cout << " " << coeff.value();
-            cout << "\n";
-
-            cout << "   m_errorLocator " << m_errorLocator << "\n";
+            //cout << "   m_errorLocator ";
+            //for (auto coeff : m_errorLocator._m_coefficients)
+            //    cout << " " << coeff.value();
+            //cout << "\n";
+            //
+            //cout << "   m_errorLocator " << m_errorLocator << "\n";
         }
 
 
@@ -295,17 +295,18 @@ public:
             auto x = GF256Element::pow2(idx);
             if (!m_errorLocator(x, errorLocatorDegree))
             {
+                /*
                 cout << "   - Root: i = " << idx
                     << "   (" << 255 - idx << ")"
                     << "   " << x.value()
                     << "   " << x.inverse().value() << endl;
                 cout << " DBG " << m_errorLocator(0).value() << endl;
-
+                */
                 auto invIndex = 255 - idx;
                 if (m_size - 1 < invIndex)
                     return; // TODO: unable to correct the error
 
-                cout << "Error at " << m_size - 1 - invIndex << "\n";
+                //cout << "Error at " << m_size - 1 - invIndex << "\n";
 
                 m_errors[m_numErrors].m_root = x.value();
                 m_errors[m_numErrors].m_location = m_size - 1 - invIndex;
@@ -332,26 +333,26 @@ public:
         // Apply Forney's algorithm to compute the error magnitudes.
         for (unsigned errorIdx = 0; errorIdx < m_numErrors; ++errorIdx)
         {
-            cout << "\n";
-            cout << "---- Forney " << errorIdx << endl;
+            //cout << "\n";
+            //cout << "---- Forney " << errorIdx << endl;
 
             GF256Element Xi = m_errors[errorIdx].m_root;
 
-            cout << "eval at " << Xi.value() << endl;
+            //cout << "eval at " << Xi.value() << endl;
             GF256Element numerator = m_errorEvaluator(Xi);
-            cout << "numerology " << numerator.value() << endl;
+            //cout << "numerology " << numerator.value() << endl;
 
             // The denominator is the formal derivative of the error locator
             // polynomial evaluated at the root.
             GF256Element denominator = m_errorLocator(Xi, derivative);
-            cout << "denominator " << denominator.value() << endl;
+            //cout << "denominator " << denominator.value() << endl;
 
             if (!denominator)
                 return; // TODO: unable to correct the error
 
-            cout << "quot: " << (numerator * denominator.inverse()).value() << endl;
-            cout << "??? " << (numerator * (denominator * Xi).inverse()).value() << endl;
-            cout << "----\n";
+            //cout << "quot: " << (numerator * denominator.inverse()).value() << endl;
+            //cout << "??? " << (numerator * (denominator * Xi).inverse()).value() << endl;
+            //cout << "----\n";
 
             m_errors[errorIdx].m_magnitude = (numerator * (denominator * Xi).inverse()).value();
         }
