@@ -1,23 +1,17 @@
 #pragma once
 
-
-
 #include <utility>
 #include <cstdint>
+#include <algorithm>
 
 #define MAX_IDX_SEQ   256
 
 constexpr std::uint8_t reduction_poly = 0x1d;
 
-constexpr
-int nextPower(int prev)
+constexpr int nextPower(int prev)
 {
     return (prev & 0x80) ? (((prev ^ 0x80) << 1) ^ reduction_poly) : (prev << 1);
 }
-
-
-
-
 
 template <typename... TArgs>
 using index_sequence_for = std::make_index_sequence<sizeof...(TArgs)>;
@@ -73,6 +67,9 @@ namespace detail
 
 
 
+// The entry at index i equals \alpha^i modulo the reduction polynomial.
+constexpr detail::IncrArray m_antiLogTable = detail::createPowerTable(0, { });
+constexpr detail::IncrArray m_logTable = detail::createLogTable(m_antiLogTable, 0, {});
 
 
   //! An element from GF(2^8).
@@ -179,12 +176,15 @@ private:
     }
 
     // The entry at index i equals \alpha^i modulo the reduction polynomial.
-    static constexpr detail::IncrArray m_antiLogTable = detail::createPowerTable(0, {});
-    static constexpr detail::IncrArray m_logTable = detail::createLogTable(GF256Element::m_antiLogTable, 0, {});
+    // --> moved outside of class due to gcc & Sload issues
+    //static constexpr detail::IncrArray m_antiLogTable = detail::createPowerTable(0, {});
+    //static constexpr detail::IncrArray m_logTable = detail::createLogTable(GF256Element::m_antiLogTable, 0, {});
 };
 
-constexpr detail::IncrArray GF256Element::m_antiLogTable;
-constexpr detail::IncrArray GF256Element::m_logTable;
+// gcc 5.3 & Sload project claims multiple defined symbol when enabling the following lines ...
+// and undefined reference if we exclude them
+//constexpr detail::IncrArray GF256Element::m_antiLogTable;
+//constexpr detail::IncrArray GF256Element::m_logTable; 
 
 
 template <typename T>

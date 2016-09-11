@@ -246,6 +246,14 @@ public:
 
         return *this;
     }
+    
+    void decode(gsl::span<uint8_t> data) noexcept
+    {
+        for (auto datum : data)
+        {
+            *this << datum;
+        }
+    }
 
     void bm()
     {
