@@ -258,14 +258,15 @@ private:
 class Error
 {
 public:
-    std::size_t location() const noexcept
+    //! Returns the index of the defective symbol.
+    std::size_t index() const noexcept
     {
         return m_location;
     }
 
     std::uint8_t correct(std::uint8_t datum) const noexcept
     {
-        return 0; // TODO
+        return std::uint8_t(Galois::GF256Value(datum) - m_magnitude);
     }
 
 //private:
@@ -357,7 +358,7 @@ public:
     }
 
     //! \brief Finishes the decoding.
-    void finish()
+    void finish() noexcept
     {
         using namespace Galois;
 
@@ -366,19 +367,29 @@ public:
 
         m_finished = true;
 
-        // Berlekamp-Massey algorithm
-        for (unsigned idx = 0; idx <= numParitySyms; ++idx)
+        // If all syndromes are zero, there is no error.
+        DecoderResult m_result = DecoderResult::Good;
+        for (auto syn : m_syndromes)
+            if (syn)
+            {
+                m_result = DecoderResult::Defective;
+                break;
+            }
+        if (m_result == DecoderResult::Good)
+            return;
+
+
+        for (unsigned idx = 1; idx <= numParitySyms; ++idx)
             m_errorLocator[idx] = m_B[idx] = 0;
         m_errorLocator[0] = m_B[0] = GF256Value(1);
 
+        // Berlekamp-Massey algorithm
         std::size_t numErrors = 0;
         for (std::size_t iteration = 0; iteration < numParitySyms; ++iteration)
         {
             GF256Value discrepancy;
             for (std::size_t idx = 0; idx <= iteration; ++idx)
                 discrepancy += m_errorLocator[idx] * m_syndromes[iteration - idx];
-
-            cout << "iter = " << iteration << "   delta = " << discrepancy.value() << "\n";
 
             if (discrepancy.value() == 0) // TODO: operator==
             {
@@ -409,15 +420,7 @@ public:
 
                 m_errorLocator = m_temp;
             }
-
-            cout << "   m_errorLocator ";
-            for (auto coeff : m_errorLocator._m_coefficients)
-                cout << " " << coeff.value();
-            cout << "\n";
-
-            cout << "   m_errorLocator " << m_errorLocator << "\n";
         }
-
 
         // Find the roots of the error locator polynomial. The roots are the
         // inverses of the error locations.
@@ -430,17 +433,9 @@ public:
             auto x = GF256Value::pow2(idx);
             if (!m_errorLocator(x, errorLocatorDegree))
             {
-                cout << "   - Root: i = " << idx
-                     << "   (" << 255 - idx << ")"
-                     << "   " << x.value()
-                     << "   " << x.inverse().value() << endl;
-                cout << " DBG " << m_errorLocator(0).value() << endl;
-
                 auto invIndex = 255 - idx;
                 if (m_size - 1 < invIndex)
                     return; // TODO: unable to correct the error
-
-                cout << "Error at " << m_size - 1 - invIndex << "\n";
 
                 m_errors[m_numErrors].m_root = x.value();
                 m_errors[m_numErrors].m_location = m_size - 1 - invIndex;
@@ -451,6 +446,9 @@ public:
 
         if (m_numErrors != errorLocatorDegree)
             return; // TODO: unable to correct the error
+
+        for (unsigned idx = 0; idx <= numParitySyms; ++idx)
+            m_errorEvaluator[idx] = 0;
 
         // Compute the error evaluator polynomial:
         // omega(x) = s(x) * lambda(x) (mod x^numParitySyms).
@@ -467,29 +465,18 @@ public:
         // Apply Forney's algorithm to compute the error magnitudes.
         for (unsigned errorIdx = 0; errorIdx < m_numErrors; ++errorIdx)
         {
-            cout << "\n";
-            cout << "---- Forney " << errorIdx << endl;
-
             GF256Value x = m_errors[errorIdx].m_root;
-
-            cout << "eval at " << x.value() << endl;
             GF256Value numerator = m_errorEvaluator(x);
-            cout << "numerology " << numerator.value() << endl;
-
             // The denominator is the formal derivative of the error locator
             // polynomial evaluated at the root.
             GF256Value denominator = m_errorLocator(x, derivative);
-            cout << "denominator " << denominator.value() << endl;
-
             if (!denominator)
                 return; // TODO: unable to correct the error
 
-            cout << "quot: " << (numerator * denominator.inverse()).value() << endl;
-            cout << "??? " << (numerator * (denominator * x).inverse()).value() << endl;
-            cout << "----\n";
-
             m_errors[errorIdx].m_magnitude = (numerator * (denominator * x).inverse()).value();
         }
+
+        m_result = DecoderResult::Correctable;
     }
 
     //! \brief Resets the decoder.
@@ -524,7 +511,7 @@ public:
 
     //! The error locator polynomial.
     Galois::GF256Polynomial<numParitySyms> m_errorLocator;
-
+    //! The error evaluator polynomial.
     Galois::GF256Polynomial<numParitySyms> m_errorEvaluator;
 
     //! A scratch polynomial needed to update the error locator polynomial.

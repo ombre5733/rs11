@@ -8,8 +8,6 @@
 #include <utility>
 
 
-#include <iostream> // TODO: HACK
-
 namespace rs11
 {
 namespace Galois
@@ -302,15 +300,6 @@ public:
         if (TDegree < 1)
             return GF256Value(0);
 
-        {
-            GF256Polynomial tmp;
-            for (unsigned i = 0; i < TDegree; i += 2)
-                tmp[i] = _m_coefficients[i + 1];
-            std::cout << "> > > > derivative should be " << tmp(x).value() << std::endl;
-        }
-        // 3 + 4 x + 5 x^2
-        // 4 + 5 * 2 * x
-
         // The even powers of the polynomial lead to the derivative
         // (p * x^n)' = n * p * x^(n-1), with n even. But we can write this as
         // n/2 * p * x^(n-1) + n/2 * p * x^(n-1) and so it is equal to
@@ -323,12 +312,6 @@ public:
         GF256Value sum(0);
         for (int even = (TDegree - 1) & ~1; even >= 0; even -= 2)
             sum = sum * x2 + _m_coefficients[even + 1];
-        std::cout << "> > > > derivative is " << sum.value() << std::endl;
-
-        sum = GF256Value(0);
-        for (int idx = TDegree; idx >= 1; idx -= 1)
-            sum = sum * x + ((idx % 2 == 0) ? GF256Value(0) : _m_coefficients[idx]);
-        std::cout << "> > > > derivative chk " << sum.value() << std::endl;
 
         return sum;
     }
