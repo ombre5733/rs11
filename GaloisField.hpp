@@ -1,83 +1,87 @@
-#pragma once
+#ifndef RS11_GALOISFIELD_HPP
+#define RS11_GALOISFIELD_HPP
 
 #include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <utility>
-#include <ostream>
 
-namespace detail
+
+#include <iostream> // TODO: HACK
+
+namespace rs11
 {
+namespace Galois
+{
+
+
+static constexpr std::size_t num_elements = 256;
+static constexpr std::uint8_t reduction_poly = 0x1d;
 
 constexpr
 int nextPower(int prev)
 {
-    return (prev & 0x80) ? (((prev ^ 0x80) << 1) ^ 0x1d) : (prev << 1);
+    return (prev & 0x80) ? (((prev ^ 0x80) << 1) ^ reduction_poly) : (prev << 1);
 }
 
-template <typename... TArgs>
-using index_sequence_for = std::make_index_sequence<sizeof...(TArgs)>;
-
-static constexpr uint32_t MAX = 256;
-
-class IncrArray
+//! A lookup table for logarithms and exponents over a Galois field.
+class Table
 {
     template <std::size_t... TIndices>
     constexpr
-        IncrArray doModify(std::size_t idx, std::uint8_t value,
-            std::index_sequence<TIndices...>) const
+    Table doModify(std::size_t idx, std::uint8_t value,
+                   std::index_sequence<TIndices...>) const noexcept
     {
-        return{ (TIndices == idx ? value : m_data[TIndices])... };
+        return { (TIndices == idx ? value : m_data[TIndices])... };
     }
 
 public:
     constexpr
-        IncrArray modified(std::size_t idx, int value) const
+    Table modified(std::size_t idx, int value) const noexcept
     {
-        return doModify(idx, value, std::make_index_sequence<MAX>());
+        return doModify(idx, value, std::make_index_sequence<num_elements>());
     }
 
     constexpr
-        std::size_t size() const
+    std::size_t size() const noexcept
     {
-        return MAX;
+        return num_elements;
     }
 
     constexpr
-        std::uint8_t operator[](std::size_t idx) const
+    std::uint8_t operator[](std::size_t idx) const noexcept
     {
         return m_data[idx];
     }
 
-    std::uint8_t m_data[MAX];
+    std::uint8_t m_data[num_elements];
 };
 
-#if 0
-    ostream& operator<< (ostream& str, const IncrArray& a)
-    {
-        for (std::size_t idx = 0; idx < a.size(); ++idx)
-            str << setw(3) << idx << "   " << setw(3) << unsigned(a[idx]) << endl;
-        return str;
-    }
-#endif
-
 constexpr
-auto createPowerTable(std::size_t idx, const IncrArray& temp) -> IncrArray
+auto createPowerTable(std::size_t idx, const Table& temp) -> Table
 {
-    return idx == MAX ? temp
-        : createPowerTable(
-            idx + 1,
-            temp.modified(idx, idx == 0 ? 1 : nextPower(temp[idx - 1])));
+    return idx == num_elements ? temp
+                      : createPowerTable(
+                            idx + 1,
+                            temp.modified(idx, idx == 0 ? 1 : nextPower(temp[idx-1])));
 }
 
 constexpr
-IncrArray createLogTable(const IncrArray& powers, std::size_t idx, const IncrArray& temp)
+Table createLogTable(const Table& powers, std::size_t idx, const Table& temp)
 {
-    return idx == MAX ? temp
-        : createLogTable(
-            powers, idx + 1,
-            temp.modified(powers[idx], powers[idx] == 1 ? 0 : idx));
+    return idx == num_elements ? temp
+                      : createLogTable(
+                            powers, idx + 1,
+                            temp.modified(powers[idx], powers[idx] == 1 ? 0 : idx));
 }
 
-} // namespace detail
+// The entry at index i equals \alpha^i modulo the reduction polynomial.
+static constexpr Table g_antiLogTable = createPowerTable(0, {});
+// The entry at index i is j such that \alpha^j = i modulo the reduction polynomial.
+static constexpr Table g_logTable = createLogTable(g_antiLogTable, 0, {});
+
+
 
 //! An element from GF(2^8).
 //!
@@ -94,18 +98,18 @@ IncrArray createLogTable(const IncrArray& powers, std::size_t idx, const IncrArr
 // \alpha is defined as root of an irreducible polynomial with degree 8, e.g.
 // p(x) = x^8 + x^1 + 1
 // template <unsigned TReductionPoly>
-class GF256Element
+class GF256Value
 {
 public:
     //! Creates the zero element.
     constexpr
-    GF256Element() noexcept
+    GF256Value() noexcept
         : m_value(0)
     {
     }
 
     constexpr
-    GF256Element(std::uint8_t value) noexcept
+    GF256Value(std::uint8_t value) noexcept
         : m_value(value)
     {
     }
@@ -114,17 +118,23 @@ public:
     //!
     //! Adds \p b to this element and returns the sum.
     constexpr
-    GF256Element operator+(GF256Element b) const noexcept
+    GF256Value operator+(GF256Value b) const noexcept
     {
         // Addition in GF(2) is the XOR function.
         return m_value ^ b.m_value;
+    }
+
+    GF256Value& operator+=(GF256Value b) noexcept
+    {
+        m_value ^= b.m_value;
+        return *this;
     }
 
     //! Computes the difference between two elements from GF(2^8).
     //!
     //! Subtracts \p b from this element and returns the difference.
     constexpr
-    GF256Element operator-(GF256Element b) const noexcept
+    GF256Value operator-(GF256Value b) const noexcept
     {
         // Subtraction in GF(2) is just an addition.
         return m_value ^ b.m_value;
@@ -134,25 +144,17 @@ public:
     //!
     //! Multiplies this element with \p b and returns the product.
     constexpr
-    GF256Element operator*(GF256Element b) const noexcept
+    GF256Value operator*(GF256Value b) const noexcept
     {
         // Exploit the relation a * b = g^{log_g(a) + log_g(b)}
         return (m_value == 0 || b.m_value == 0)
                ? 0
-               : m_antiLogTable[mod(m_logTable[m_value] + m_logTable[b.m_value])];
+               : g_antiLogTable[mod(g_logTable[m_value] + g_logTable[b.m_value])];
     }
 
-    //! Adds \p to this element.
-    GF256Element& operator+=(GF256Element b) noexcept
+    GF256Value inverse() const noexcept
     {
-        m_value += b.m_value;
-        return *this;
-    }
-
-    constexpr
-    GF256Element inverse() const noexcept
-    {
-        return m_antiLogTable[255 - m_logTable[m_value]];
+        return g_antiLogTable[255 - g_logTable[m_value]];
     }
 
     // TODO: Remove
@@ -173,14 +175,14 @@ public:
     {
         return m_value != 0;
     }
-    
+
     //! Returns 2 raised to the power \p p.
     //!
     //! Returns the GF(2^8) element <tt>2^p</tt>.
     static constexpr
-    GF256Element pow2(unsigned p)
+    GF256Value pow2(unsigned p)
     {
-        return m_antiLogTable[p % 255];
+        return g_antiLogTable[p % 255];
     }
 
 private:
@@ -193,22 +195,15 @@ private:
         // element, i.e. the number of non-zero elements of the field.
         return x < 255 ? x : x - 255;
     }
-
-    // The entry at index i equals \alpha^i modulo the reduction polynomial.
-    static constexpr detail::IncrArray m_antiLogTable = detail::createPowerTable(0, {});
-    static constexpr detail::IncrArray m_logTable = detail::createLogTable(GF256Element::m_antiLogTable, 0, {});
 };
 
-constexpr detail::IncrArray GF256Element::m_antiLogTable;
-constexpr detail::IncrArray GF256Element::m_logTable;
 
 
-template <typename T>
-constexpr
-T const& cmax(T const& a, T const& b)
+struct derivative_t
 {
-    return a > b ? a : b;
-}
+};
+
+constexpr derivative_t derivative;
 
 //! A polynomial with coefficients in GF(2^8).
 //!
@@ -217,18 +212,24 @@ T const& cmax(T const& a, T const& b)
 template <std::size_t TDegree>
 class GF256Polynomial
 {
+    static constexpr
+    std::size_t cmax(std::size_t a, std::size_t b)
+    {
+        return a < b ? b : a;
+    }
+
     template <std::size_t TDeg, std::size_t... TIndices>
     constexpr
     GF256Polynomial<sizeof...(TIndices) - 1>
     doAdd(const GF256Polynomial<TDeg>& b,
-          index_sequence<TIndices...>) const noexcept
+          std::index_sequence<TIndices...>) const noexcept
     {
         return { (coeff(TIndices) + b.coeff(TIndices))... };
     }
 
     template <std::size_t TDeg>
     constexpr
-    GF256Element doConvPart(const GF256Polynomial<TDeg>& b,
+    GF256Value doConvPart(const GF256Polynomial<TDeg>& b,
                             std::size_t degA, std::size_t degB) const noexcept
     {
         return degA == 0 ? coeff(degA) * b.coeff(degB)
@@ -240,7 +241,7 @@ class GF256Polynomial
     constexpr
     GF256Polynomial<sizeof...(TIndices) - 1>
     doMul(const GF256Polynomial<TDeg>& b,
-          index_sequence<TIndices...>) const noexcept
+          std::index_sequence<TIndices...>) const noexcept
     {
         return { doConvPart(b, TIndices, 0)... };
     }
@@ -251,13 +252,6 @@ public:
 //        : _m_coefficients{}
 //    {
 //    }
-
-    constexpr
-    GF256Polynomial(const GF256Element(&coeffs)[TDegree + 1]) noexcept
-    {
-        using namespace std;
-        copy(begin(coeffs), end(coeffs), begin(_m_coefficients));
-    }
 
     template <std::size_t TDeg>
     constexpr
@@ -286,32 +280,71 @@ public:
     }
 
     //! Evaluates the polynomial.
-    GF256Element operator()(GF256Element x) const noexcept
+    GF256Value operator()(GF256Value x) const noexcept
     {
-        GF256Element sum{_m_coefficients[TDegree]};
+        GF256Value sum{_m_coefficients[TDegree]};
         for (std::size_t deg = TDegree; deg > 0; --deg)
             sum = sum * x + _m_coefficients[deg - 1];
         return sum;
     }
 
     //! Evaluates the polynomial of a certain degree.
-    GF256Element operator()(GF256Element x, std::size_t degree) const noexcept
+    GF256Value operator()(GF256Value x, std::size_t degree) const noexcept
     {
-        GF256Element sum{_m_coefficients[degree]};
+        GF256Value sum{_m_coefficients[degree]};
         for (std::size_t deg = degree; deg > 0; --deg)
             sum = sum * x + _m_coefficients[deg - 1];
         return sum;
     }
 
-    //! Returns the coefficient of a monomial.
-    constexpr
-    GF256Element coeff(std::size_t degree) const noexcept
+    GF256Value operator()(GF256Value x, derivative_t) const noexcept
     {
-        return degree <= TDegree ? _m_coefficients[degree] : GF256Element();
+        if (TDegree < 1)
+            return GF256Value(0);
+
+        {
+            GF256Polynomial tmp;
+            for (unsigned i = 0; i < TDegree; i += 2)
+                tmp[i] = _m_coefficients[i + 1];
+            std::cout << "> > > > derivative should be " << tmp(x).value() << std::endl;
+        }
+        // 3 + 4 x + 5 x^2
+        // 4 + 5 * 2 * x
+
+        // The even powers of the polynomial lead to the derivative
+        // (p * x^n)' = n * p * x^(n-1), with n even. But we can write this as
+        // n/2 * p * x^(n-1) + n/2 * p * x^(n-1) and so it is equal to
+        // zero (because we are in GF(2) and addition is a XOR).
+        //
+        // The odd powers result in n * p * x^(n-1), with n odd. This reduces to
+        // (n-1)/2 * p * x^(n-1) + (n-1)/2 * p * x^(n-1) + p * x^(n-1) =
+        // p * x^(n-1). So only odd powers survive.
+        GF256Value x2 = x * x;
+        GF256Value sum(0);
+        for (int even = (TDegree - 1) & ~1; even >= 0; even -= 2)
+            sum = sum * x2 + _m_coefficients[even + 1];
+        std::cout << "> > > > derivative is " << sum.value() << std::endl;
+
+        sum = GF256Value(0);
+        for (int idx = TDegree; idx >= 1; idx -= 1)
+            sum = sum * x + ((idx % 2 == 0) ? GF256Value(0) : _m_coefficients[idx]);
+        std::cout << "> > > > derivative chk " << sum.value() << std::endl;
+
+        return sum;
     }
 
     //! Returns the coefficient of a monomial.
-    GF256Element& operator[](std::size_t degree) noexcept
+    //!
+    //! Returns the coefficient of the monomial of given \p degree. Zero is
+    //! returned if \p degree is higher than the degree of the polynomial.
+    constexpr
+    GF256Value coeff(std::size_t degree) const noexcept
+    {
+        return degree <= TDegree ? _m_coefficients[degree] : GF256Value();
+    }
+
+    //! Returns the coefficient of a monomial.
+    GF256Value& operator[](std::size_t degree) noexcept
     {
         return _m_coefficients[degree];
     }
@@ -319,9 +352,8 @@ public:
     //! Multiplies the polynomial inplace with the polynomial \f$ p(x) = x \f$.
     void timesX() noexcept
     {
-        // Shift the coefficients: [a, b, c, d] -> [d, a, b, c].
-        std::rotate(&_m_coefficients[0], &_m_coefficients[0] + TDegree,
-                    &_m_coefficients[0] + TDegree + 1);
+        // Shift the coefficients [a, b, c, d] -> [d, a, b, c].
+        std::rotate(&_m_coefficients[0], &_m_coefficients[TDegree], &_m_coefficients[TDegree + 1]);
         _m_coefficients[0] = 0;
     }
 
@@ -334,40 +366,13 @@ public:
         return 0;
     }
 
-    //! Compares two polynomials.
-    //!
-    //! Returns \p true if this polynomial is equal to \p rhs.
-    constexpr
-    bool operator==(const GF256Polynomial& rhs) const noexcept
-    {
-        using namespace std;
-        return equal(begin(_m_coefficients), end(_m_coefficients), begin(rhs._m_coefficients));
-    }
-
-
 
 
     // The coefficients of the polynomial.
-    GF256Element _m_coefficients[TDegree + 1];
+    GF256Value _m_coefficients[TDegree + 1];
 };
 
+} // namespace Galois
+} // namespace rs11
 
-
-inline
-std::ostream& operator<<(std::ostream& str, GF256Element e)
-{
-    str << e.value();
-    return str;
-}
-
-template <std::size_t TDeg>
-std::ostream& operator<<(std::ostream& str, const GF256Polynomial<TDeg>& p)
-{
-    for (std::size_t i = 0; i <= TDeg; ++i)
-    {
-        if (i)
-            str << " + ";
-        str << p.coeff(i) << " x^" << i;
-    }
-    return str;
-}
+#endif // RS11_GALOISFIELD_HPP
