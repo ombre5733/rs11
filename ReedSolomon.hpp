@@ -1,12 +1,16 @@
 #ifndef RS11_REEDSOLOMON_HPP
 #define RS11_REEDSOLOMON_HPP
 
+#include "_config.hpp"
 #include "GaloisField.hpp"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
 
+#if RS11_HAVE_GSL
+#include <gsl/span>
+#endif // RS11_HAVE_GSL
 
 namespace rs11
 {
@@ -133,6 +137,27 @@ public:
 
         return *this;
     }
+
+#if RS11_HAVE_GSL
+    //! \brief Encodes a message.
+    //!
+    //! Encodes the given \p message. The encoding is automatically finalized
+    //! with a call to finish().
+    void encode(gsl::span<const std::uint8_t> message)
+    {
+        encodePart(message.data(), message.size());
+        finish();
+    }
+
+    //! \brief Encodes a part of a message.
+    //!
+    //! Encodes the message part given by \p message. When all parts have been
+    //! encoded, finish() has to be called.
+    void encodePart(gsl::span<const std::uint8_t> message)
+    {
+        encodePart(message.data(), message.size());
+    }
+#endif // RS11_HAVE_GSL
 
     //! \brief Finishes encoding.
     //!
@@ -376,6 +401,27 @@ public:
 
         return *this;
     }
+
+#if RS11_HAVE_GSL
+    //! \brief Decodes a message.
+    //!
+    //! Decodes the given \p message. The decoding is automatically finalized
+    //! with a call to finish().
+    void decode(gsl::span<const std::uint8_t> message)
+    {
+        decodePart(message.data(), message.size());
+        finish();
+    }
+
+    //! \brief Decodes a part of a message.
+    //!
+    //! Decodes the message part given by \p message. When all parts have been
+    //! decoded, finish() has to be called.
+    void decodePart(gsl::span<const std::uint8_t> message)
+    {
+        decodePart(message.data(), message.size());
+    }
+#endif // RS11_HAVE_GSL
 
     //! \brief Finishes the decoding.
     void finish() noexcept

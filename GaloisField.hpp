@@ -1,6 +1,8 @@
 #ifndef RS11_GALOISFIELD_HPP
 #define RS11_GALOISFIELD_HPP
 
+#include "_config.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstddef>
