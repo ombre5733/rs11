@@ -386,7 +386,10 @@ public:
 
         m_finished = true;
 
-        // If all syndromes are zero, there is no error.
+        // If all syndromes are zero, there is no error. In that case, we
+        // can return immediately. If we find an erronous syndrome, assume
+        // that the message is defective and cannot be corrected. Only set it
+        // to correctable if we know for sure that correction is feasible.
         m_result = DecoderResult::Good;
         for (auto syn : m_syndromes)
             if (syn)
@@ -463,6 +466,9 @@ public:
             }
         }
 
+        // If not all roots of the error locator polynomial were found (the
+        // number of roots is smaller than the degree), the message cannot
+        // be corrected.
         if (m_numErrors != errorLocatorDegree)
             return; // TODO: unable to correct the error
 
