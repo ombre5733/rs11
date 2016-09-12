@@ -356,6 +356,8 @@ public:
     {
         if (m_size == N)
             throw std::exception();
+        if (m_finished)
+            throw std::exception();
 
         ++m_size;
 
@@ -501,6 +503,9 @@ public:
     //! Resets the internal state and prepares the decoder for a new message.
     void reset() noexcept
     {
+        for (auto& syn : m_syndromes)
+            syn = 0;
+
         m_result = DecoderResult::Good;
         m_numErrors = 0;
         m_size = 0;
