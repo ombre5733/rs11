@@ -1,3 +1,6 @@
+# For private use only.
+# Copyright (c) Manuel Freiberger, 2016.
+
 TEMPLATE = app
 CONFIG += console c++14
 CONFIG -= app_bundle

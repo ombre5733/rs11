@@ -1,3 +1,6 @@
+// For private use only.
+// Copyright (c) Manuel Freiberger, 2016.
+
 #include "catch.hpp"
 
 #include "../GaloisField.hpp"

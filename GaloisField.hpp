@@ -1,3 +1,6 @@
+// For private use only.
+// Copyright (c) Manuel Freiberger, 2016.
+
 #ifndef RS11_GALOISFIELD_HPP
 #define RS11_GALOISFIELD_HPP
 
