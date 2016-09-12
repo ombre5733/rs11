@@ -162,12 +162,18 @@ public:
         return m_value;
     }
 
+    //! \brief Compares two elements from GF(2^8).
+    //!
+    //! Returns \p true, if this element is equal to \p b.
     constexpr
     bool operator==(GF256Value b) const noexcept
     {
         return m_value == b.m_value;
     }
 
+    //! \brief Compares two elements from GF(2^8).
+    //!
+    //! Returns \p true, if this element is not equal to \p b.
     constexpr
     bool operator!=(GF256Value b) const noexcept
     {
@@ -180,6 +186,9 @@ public:
         return m_value;
     }
 
+    //! \brief Compares the element against zero.
+    //!
+    //! Returns \p true, if this element is non-zero.
     explicit
     operator bool() const noexcept
     {
