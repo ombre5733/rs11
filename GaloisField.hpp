@@ -210,12 +210,6 @@ constexpr derivative_t derivative;
 template <std::size_t TDegree>
 class GF256Polynomial
 {
-    static constexpr
-    std::size_t cmax(std::size_t a, std::size_t b)
-    {
-        return a < b ? b : a;
-    }
-
     template <std::size_t TDeg, std::size_t... TIndices>
     constexpr
     GF256Polynomial<sizeof...(TIndices) - 1>
@@ -254,7 +248,7 @@ public:
     template <std::size_t TDeg>
     constexpr
     auto operator+(const GF256Polynomial<TDeg>& b) const noexcept
-        -> GF256Polynomial<cmax(TDegree ,TDeg)>
+        -> GF256Polynomial<(TDegree > TDeg) ? TDegree : TDeg>
     {
         return doAdd(b, std::make_index_sequence<cmax(TDegree, TDeg) + 1>());
     }
@@ -262,7 +256,7 @@ public:
     template <std::size_t TDeg>
     constexpr
     auto operator-(const GF256Polynomial<TDeg>& b) const noexcept
-        -> GF256Polynomial<cmax(TDegree, TDeg)>
+        -> GF256Polynomial<(TDegree > TDeg) ? TDegree : TDeg>
     {
         // Subtraction in GF(2^8) equals addition.
         return doAdd(b, std::make_index_sequence<cmax(TDegree, TDeg) + 1>());
