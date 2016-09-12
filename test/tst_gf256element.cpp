@@ -10,6 +10,8 @@ TEST_CASE("addition", "[gf256]")
     {
         GF256Value a(value);
         REQUIRE(a + a == GF256Value(0));
+        REQUIRE(a + GF256Value(0) == a);
+        REQUIRE(GF256Value(0) + a == a);
     }
 }
 
@@ -19,6 +21,8 @@ TEST_CASE("subtraction", "[gf256]")
     {
         GF256Value a(value);
         REQUIRE(a - a == GF256Value(0));
+        REQUIRE(a - GF256Value(0) == a);
+        REQUIRE(GF256Value(0) - a == a);
     }
 }
 
