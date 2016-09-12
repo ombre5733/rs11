@@ -163,6 +163,18 @@ public:
     }
 
     constexpr
+    bool operator==(GF256Value b) const noexcept
+    {
+        return m_value == b.m_value;
+    }
+
+    constexpr
+    bool operator!=(GF256Value b) const noexcept
+    {
+        return m_value != b.m_value;
+    }
+
+    constexpr
     explicit operator std::uint8_t() const noexcept
     {
         return m_value;
@@ -250,7 +262,7 @@ public:
     auto operator+(const GF256Polynomial<TDeg>& b) const noexcept
         -> GF256Polynomial<(TDegree > TDeg) ? TDegree : TDeg>
     {
-        return doAdd(b, std::make_index_sequence<cmax(TDegree, TDeg) + 1>());
+        return doAdd(b, std::make_index_sequence<((TDegree > TDeg) ? TDegree : TDeg) + 1>());
     }
 
     template <std::size_t TDeg>
@@ -259,7 +271,7 @@ public:
         -> GF256Polynomial<(TDegree > TDeg) ? TDegree : TDeg>
     {
         // Subtraction in GF(2^8) equals addition.
-        return doAdd(b, std::make_index_sequence<cmax(TDegree, TDeg) + 1>());
+        return doAdd(b, std::make_index_sequence<((TDegree > TDeg) ? TDegree : TDeg) + 1>());
     }
 
     //! Returns the product of two polynomials.
