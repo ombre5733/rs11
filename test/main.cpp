@@ -1,5 +1,7 @@
-//#define CATCH_CONFIG_MAIN
-//#include "catch.hpp"
+#define CATCH_CONFIG_MAIN
+#include "catch.hpp"
+
+#if 0
 
 #include "../ReedSolomon.hpp"
 
@@ -101,11 +103,12 @@ int main()
 
     cout << "Parity: ";
     std::vector<std::uint8_t> encData = data;
-    for (auto iter = rsEnc.begin(); iter != rsEnc.end(); ++iter)
-    {
-        cout << std::dec << int(*iter) << " ";
-        encData.push_back(*iter);
-    }
+    //for (auto iter = rsEnc.begin(); iter != rsEnc.end(); ++iter)
+    //{
+    //    cout << std::dec << int(*iter) << " ";
+    //    encData.push_back(*iter);
+    //}
+    std::copy(rsEnc.begin(), rsEnc.end(), std::back_inserter(encData));
     cout << endl << endl;
 
     // Introduce errors.
@@ -173,3 +176,4 @@ int main()
     printVector("Transmitted ", defData);
     printVector("Corrected   ", corrData);
 }
+#endif
