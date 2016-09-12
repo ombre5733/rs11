@@ -64,7 +64,7 @@ public:
     //! Creates a Reed-Solomon encoder.
     constexpr
     ReedSolomonEncoder() noexcept
-        : m_polynomial{detail::createReedSolomonGeneratorPolynomial<numParitySyms>()},
+        : m_polynomial(detail::createReedSolomonGeneratorPolynomial<numParitySyms>()),
           m_scratchIter{&m_scratch[0]},
           m_size{0},
           m_finished{false}
@@ -78,7 +78,7 @@ public:
     //!
     //! Encodes the given \p message consisting of \p length bytes. The
     //! encoding is finalized right away.
-    void encode(std::uint8_t* message, std::size_t length)
+    void encode(const std::uint8_t* message, std::size_t length)
     {
         encodePart(message, length);
         finish();
@@ -89,7 +89,7 @@ public:
     //! Encodes the given \p message consisting of \p length bytes. This method
     //! can be called multiple times until the whole message is complete.
     //! At the end, finish() must be called to finalize the encoding.
-    void encodePart(std::uint8_t* message, std::size_t length)
+    void encodePart(const std::uint8_t* message, std::size_t length)
     {
         if (m_size + length > N)
             throw std::exception();
@@ -407,7 +407,7 @@ public:
         // Find the roots of the error locator polynomial. The roots are the
         // inverses of the error locations.
         // TODO: Chien search was faster, if we stored the error locator
-        // polynomial in logarithmic form. We would spare a loot of table
+        // polynomial in logarithmic form. We would spare a lot of table
         // look-ups for the multiplications.
         auto errorLocatorDegree = m_errorLocator.degree();
         for (unsigned idx = 1; idx <= 255; ++idx)
