@@ -351,7 +351,8 @@ public:
 
     //! \brief Adds another byte to decoding.
     //!
-    //! Adds the \p datum to the decoding.
+    //! Adds the \p datum to the decoding. The decoding must be finalized
+    //! with a call to finish().
     ReedSolomonDecoder& operator<<(std::uint8_t datum) noexcept
     {
         if (m_size == N)
@@ -498,7 +499,8 @@ public:
             if (!denominator)
                 return; // TODO: unable to correct the error
 
-            m_errors[errorIdx].m_magnitude = (numerator * (denominator * x).inverse()).value();
+            m_errors[errorIdx].m_magnitude
+                = (numerator * (denominator * x).inverse()).value();
         }
 
         m_result = DecoderResult::Correctable;
@@ -518,6 +520,12 @@ public:
         m_finished = false;
     }
 
+    //! \brief Returns the errors.
+    //!
+    //! Returns a range of errors. This method must only be called after the
+    //! decoding has been finalized with a call to finish() and if the
+    //! result is not DecoderResult::Defective. If the message did not
+    //! contain errors, an empty range is returned.
     ErrorRange errors() const
     {
         if (!m_finished)
@@ -528,6 +536,7 @@ public:
         return ErrorRange(&m_errors[0], &m_errors[0] + m_numErrors);
     }
 
+    //! \brief Returns the result of the decoding.
     DecoderResult result() const
     {
         if (!m_finished)

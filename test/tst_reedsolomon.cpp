@@ -10,6 +10,7 @@ TEST_CASE("RS encoding", "[rs]")
 
     using Encoder = rs11::ReedSolomonEncoder<255, 251>;
     Encoder encoder;
+    REQUIRE(encoder.numParitySymbols() == 4);
 
     encoder.encode(&data[0], data.size());
     std::vector<std::uint8_t> parity1;
