@@ -314,6 +314,41 @@ public:
     ReedSolomonDecoder(const ReedSolomonDecoder&) = delete;
     ReedSolomonDecoder& operator=(const ReedSolomonDecoder&) = delete;
 
+    //! \brief Decodes a message.
+    //!
+    //! Decodes the given \p message consisting of \p length bytes. The
+    //! decoding is finalized right away.
+    void decode(const std::uint8_t* message, std::size_t length)
+    {
+        decodePart(message, length);
+        finish();
+    }
+
+    //! \brief Decodes a part of a message.
+    //!
+    //! Decodes the given \p message consisting of \p length bytes. This method
+    //! can be called multiple times until the whole message is complete.
+    //! At the end, finish() must be called to finalize the decoding.
+    void decodePart(const std::uint8_t* message, std::size_t length)
+    {
+        if (m_size + length > N)
+            throw std::exception();
+        if (m_finished)
+            throw std::exception();
+
+        m_size += length;
+        while (length--)
+        {
+            Galois::GF256Value x = *message++;
+            for (size_t idx = 0; idx < numParitySyms; ++idx)
+            {
+                // TODO: Speed up with
+                // if m_syndrome[idx] == 0: m_syndrome[idx] = datum;
+                m_syndromes[idx] = m_syndromes[idx] * Galois::GF256Value::pow2(idx) + x;
+            }
+        }
+    }
+
     //! \brief Adds another byte to decoding.
     //!
     //! Adds the \p datum to the decoding.
