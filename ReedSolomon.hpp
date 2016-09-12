@@ -11,7 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 
-#if RS11_HAVE_GSL
+#ifdef RS11_HAVE_GSL
 #include <gsl/span>
 #endif // RS11_HAVE_GSL
 
@@ -141,7 +141,7 @@ public:
         return *this;
     }
 
-#if RS11_HAVE_GSL
+#ifdef RS11_HAVE_GSL
     //! \brief Encodes a message.
     //!
     //! Encodes the given \p message. The encoding is automatically finalized
@@ -417,7 +417,7 @@ public:
         return *this;
     }
 
-#if RS11_HAVE_GSL
+#ifdef RS11_HAVE_GSL
     //! \brief Decodes a message.
     //!
     //! Decodes the given \p message. The decoding is automatically finalized

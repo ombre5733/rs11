@@ -4,8 +4,8 @@
 #ifndef RS11_USER_CONFIG_HPP
 #define RS11_USER_CONFIG_HPP
 
-// If non-zero, GSL support is added.
-#define RS11_HAVE_GSL   0
+// If this macro is defined, GSL support is added.
+// #define RS11_HAVE_GSL
 
 // ----=====================================================================----
 //     Private section.
