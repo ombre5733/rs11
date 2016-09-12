@@ -522,7 +522,7 @@ public:
     {
         if (!m_finished)
             throw std::exception();
-        if (m_result != DecoderResult::Correctable)
+        if (m_result == DecoderResult::Defective)
             throw std::exception();
 
         return ErrorRange(&m_errors[0], &m_errors[0] + m_numErrors);
