@@ -258,15 +258,27 @@ private:
 
 
 
+//! \brief An error in a message.
+//!
+//! The Error class encapsulates an error detected during Reed-Solomon decoding.
+//! It stores the index of the erronous symbol in the message. It also stores
+//! stores the magnitude of the error, which is needed to restore the
+//! original value.
 class Error
 {
 public:
+    //! \brief The index of the defective symbols.
+    //!
     //! Returns the index of the defective symbol.
     std::size_t index() const noexcept
     {
         return m_location;
     }
 
+    //! \brief Corrects a defective symbol.
+    //!
+    //! Subtracts the error magnitude from the erronous \p datum and returns
+    //! the corrected value.
     std::uint8_t correct(std::uint8_t datum) const noexcept
     {
         return std::uint8_t(Galois::GF256Value(datum) - m_magnitude);
