@@ -98,11 +98,13 @@ public:
     //! At the end, finish() must be called to finalize the encoding.
     void encodePart(const std::uint8_t* message, std::size_t length)
     {
-        if (m_size + length > N)
-            throw std::exception();
-        if (m_finished)
-            throw std::exception();
-
+        #ifndef RS11_NO_EXCEPTIONS        
+            if (m_size + length > N)
+                throw std::exception();
+            if (m_finished)
+                throw std::exception();
+        #endif
+        
         m_size += length;
 
         // Fill up the scratch space except the last slot.
@@ -200,7 +202,11 @@ public:
                       "Mismatch in the representation.");
 
         if (!m_finished)
-            throw std::exception();
+            #ifndef RS11_NO_EXCEPTIONS
+                throw std::exception();
+            #else
+                return nullptr;
+            #endif
 
         return reinterpret_cast<std::uint8_t*>(&m_scratch[0]);
     }
@@ -216,7 +222,11 @@ public:
                       "Mismatch in the representation.");
 
         if (!m_finished)
-            throw std::exception();
+            #ifndef RS11_NO_EXCEPTIONS
+                throw std::exception();
+            #else
+                return nullptr;
+            #endif
 
         // Spare the last element.
         return reinterpret_cast<std::uint8_t*>(&m_scratch[numParitySyms]);
@@ -371,10 +381,12 @@ public:
     //! At the end, finish() must be called to finalize the decoding.
     void decodePart(const std::uint8_t* message, std::size_t length)
     {
-        if (m_size + length > N)
-            throw std::exception();
-        if (m_finished)
-            throw std::exception();
+        #ifndef RS11_NO_EXCEPTIONS
+            if (m_size + length > N)
+                throw std::exception();
+            if (m_finished)
+                throw std::exception();
+        #endif
 
         m_size += length;
         while (length--)
@@ -601,7 +613,11 @@ public:
     DecoderResult result() const
     {
         if (!m_finished)
-            throw std::exception();
+            #ifdef RS11_NO_EXCEPTIONS
+                return DecoderResult::Defective;
+            #else
+                throw std::exception();
+            #endif
         return m_result;
     }
 
