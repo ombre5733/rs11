@@ -228,7 +228,6 @@ struct derivative_t
 };
 
 constexpr derivative_t derivative;
-
 //! A polynomial with coefficients in GF(2^8).
 //!
 //! The GF256Polynomial is a polynomial whose coefficients are elements
@@ -270,7 +269,7 @@ public:
 //        : _m_coefficients{}
 //    {
 //    }
-
+#ifndef _MSC_VER
     template <std::size_t TDeg>
     constexpr
     auto operator+(const GF256Polynomial<TDeg>& b) const noexcept
@@ -278,6 +277,7 @@ public:
     {
         return doAdd(b, std::make_index_sequence<((TDegree > TDeg) ? TDegree : TDeg) + 1>());
     }
+
 
     template <std::size_t TDeg>
     constexpr
@@ -287,7 +287,7 @@ public:
         // Subtraction in GF(2^8) equals addition.
         return doAdd(b, std::make_index_sequence<((TDegree > TDeg) ? TDegree : TDeg) + 1>());
     }
-
+#endif
     //! Returns the product of two polynomials.
     template <std::size_t TDeg>
     constexpr
@@ -296,6 +296,7 @@ public:
     {
         return doMul(b, std::make_index_sequence<TDegree + TDeg + 1>());
     }
+
 
     //! Evaluates the polynomial.
     GF256Value operator()(GF256Value x) const noexcept
@@ -370,11 +371,11 @@ public:
     }
 
 
+//#endif
 
     // The coefficients of the polynomial.
     GF256Value _m_coefficients[TDegree + 1];
 };
-
 } // namespace Galois
 } // namespace rs11
 

@@ -15,6 +15,11 @@
 #include <gsl/span>
 #endif // RS11_HAVE_GSL
 
+#ifndef RS11_NO_EXCEPTIONS
+    #define RS11_ERR_NOEXCEPT
+#else
+    #define RS11_ERR_NOEXCEPT   noexcept
+#endif
 namespace rs11
 {
 
@@ -69,12 +74,28 @@ public:
 
 
     //! Creates a Reed-Solomon encoder.
+#ifndef _MSC_VER
     constexpr
+#endif
     ReedSolomonEncoder() noexcept
         : m_polynomial(detail::createReedSolomonGeneratorPolynomial<numParitySyms>()),
           m_scratchIter{&m_scratch[0]},
+          m_scratch(),
           m_size{0},
           m_finished{false}
+    {
+    }
+
+    //! Creates a Reed-Solomon encoder, with agiven polynom
+#ifndef _MSC_VER
+    constexpr
+#endif
+    ReedSolomonEncoder(const Galois::GF256Polynomial<numParitySyms>& poly) noexcept
+        : m_polynomial(poly),
+        m_scratchIter{ &m_scratch[0] },
+        m_scratch(),
+        m_size{ 0 },
+        m_finished{ false }
     {
     }
 
@@ -126,12 +147,14 @@ public:
     //!
     //! Encodes the given \p datum. When all bytes have been added,
     //! finish() must be called to finalize the encoding.
-    ReedSolomonEncoder& operator<<(std::uint8_t datum) noexcept
+    ReedSolomonEncoder& operator<<(std::uint8_t datum) RS11_ERR_NOEXCEPT
     {
+        #ifndef RS11_NO_EXCEPTIONS
         if (m_size == N)
             throw std::exception();
         if (m_finished)
             throw std::exception();
+        #endif
 
         ++m_size;
         *m_scratchIter = datum;
@@ -196,7 +219,7 @@ public:
     //! Returns an iterator to the first parity symbol. This method can only
     //! be called when the encoding has been finalized (either with finish()
     //! or encode()).
-    const std::uint8_t* begin() noexcept
+    const std::uint8_t* begin() RS11_ERR_NOEXCEPT
     {
         static_assert(sizeof(Galois::GF256Value) == sizeof(std::uint8_t),
                       "Mismatch in the representation.");
@@ -216,7 +239,7 @@ public:
     //! Returns an iterator past the last parity symbol. This method can only
     //! be called when the encoding has been finalized (either with finish()
     //! or encode()).
-    const std::uint8_t* end() noexcept
+    const std::uint8_t* end() RS11_ERR_NOEXCEPT
     {
         static_assert(sizeof(Galois::GF256Value) == sizeof(std::uint8_t),
                       "Mismatch in the representation.");
@@ -405,7 +428,7 @@ public:
     //!
     //! Adds the \p datum to the decoding. The decoding must be finalized
     //! with a call to finish().
-    ReedSolomonDecoder& operator<<(std::uint8_t datum) noexcept
+    ReedSolomonDecoder& operator<<(std::uint8_t datum) //noexcept
     {
         if (m_size == N)
             throw std::exception();

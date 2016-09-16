@@ -4,6 +4,7 @@
 #include "catch.hpp"
 
 #include "../ReedSolomon.hpp"
+#include "testvectors.h"
 
 #include <algorithm>
 
@@ -35,6 +36,20 @@ TEST_CASE("RS encoding", "[rs]")
 
     REQUIRE(parity1 == parity2);
     REQUIRE(parity1 == parity3);
+}
+
+TEST_CASE("RS syndromes", "[rs]")
+{
+    constexpr rs11::Galois::GF256Polynomial<4> POLY_255_251 = { { 1, 30, 216, 231, 116 } };
+    for (auto &r : testVectors)
+    {
+        rs11::ReedSolomonEncoder<255, 251> rs(POLY_255_251);
+        rs.encode(&r[0], 251);
+        auto i = rs.begin();
+        auto j = &r[251];
+        REQUIRE(memcmp(rs.begin(), &r[251], 4) == 0);
+    }
+
 }
 
 TEST_CASE("RS round-trip", "[rs]")
