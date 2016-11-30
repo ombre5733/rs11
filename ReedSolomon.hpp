@@ -92,8 +92,8 @@ public:
 #endif
     ReedSolomonEncoder(const Galois::GF256Polynomial<numParitySyms>& poly) noexcept
         : m_polynomial(poly),
-        m_scratchIter{ &m_scratch[0] },
         m_scratch(),
+        m_scratchIter{ &m_scratch[0] },
         m_size{ 0 },
         m_finished{ false }
     {
@@ -117,13 +117,16 @@ public:
     //! Encodes the given \p message consisting of \p length bytes. This method
     //! can be called multiple times until the whole message is complete.
     //! At the end, finish() must be called to finalize the encoding.
-    void encodePart(const std::uint8_t* message, std::size_t length)
+    void encodePart(const std::uint8_t* message, std::size_t length) RS11_ERR_NOEXCEPT
     {
         #ifndef RS11_NO_EXCEPTIONS        
             if (m_size + length > N)
                 throw std::exception();
             if (m_finished)
                 throw std::exception();
+        #else
+            if ((m_size + length > N) || m_finished)
+                return;
         #endif
         
         m_size += length;
@@ -154,6 +157,9 @@ public:
             throw std::exception();
         if (m_finished)
             throw std::exception();
+        #else
+            if((m_size == N) || m_finished)
+                return 
         #endif
 
         ++m_size;
@@ -166,13 +172,15 @@ public:
         return *this;
     }
 
-#ifdef RS11_HAVE_GSL
+    #ifdef RS11_HAVE_GSL
     //! \brief Encodes a message.
     //!
     //! Encodes the given \p message. The encoding is automatically finalized
     //! with a call to finish().
-    void encode(gsl::span<const std::uint8_t> message)
+    template<typename T>
+    void encode(gsl::span<const T> message)
     {
+        static_assert(sizeof(T) == 8, "RS implemntation only works with bytes");
         encodePart(message.data(), message.size());
         finish();
     }
@@ -181,11 +189,13 @@ public:
     //!
     //! Encodes the message part given by \p message. When all parts have been
     //! encoded, finish() has to be called.
-    void encodePart(gsl::span<const std::uint8_t> message)
+    template<typename T>
+    void encodePart(gsl::span<const T> message)
     {
+        static_assert(sizeof(T) == 8, "RS implemntation only works with bytes");
         encodePart(message.data(), message.size());
     }
-#endif // RS11_HAVE_GSL
+    #endif // RS11_HAVE_GSL
 
     //! \brief Finishes encoding.
     //!
@@ -405,7 +415,7 @@ public:
     void decodePart(const std::uint8_t* message, std::size_t length)
     {
         #ifndef RS11_NO_EXCEPTIONS
-            if (m_size + length > N)
+            if (m_size + length > M)
                 throw std::exception();
             if (m_finished)
                 throw std::exception();
@@ -636,11 +646,13 @@ public:
     DecoderResult result() const
     {
         if (!m_finished)
+        {
             #ifdef RS11_NO_EXCEPTIONS
                 return DecoderResult::Defective;
             #else
                 throw std::exception();
             #endif
+        }
         return m_result;
     }
 

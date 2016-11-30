@@ -48,6 +48,12 @@ TEST_CASE("RS syndromes", "[rs]")
         auto i = rs.begin();
         auto j = &r[251];
         REQUIRE(memcmp(rs.begin(), &r[251], 4) == 0);
+
+        rs11::ReedSolomonDecoder<255, 251> rs_d;
+        rs_d.decode({ r });
+        auto res = rs_d.result();
+        REQUIRE((res == rs11::DecoderResult::Correctable || res == rs11::DecoderResult::Good));
+        REQUIRE(rs_d.errors().begin() == rs_d.errors().end());
     }
 
 }
