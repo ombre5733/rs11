@@ -1,5 +1,3 @@
-// For private use only.
-// Copyright (c) Manuel Freiberger, 2016.
 
 #ifndef RS11_USER_CONFIG_HPP
 #define RS11_USER_CONFIG_HPP
