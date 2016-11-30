@@ -179,10 +179,10 @@ public:
     //!
     //! Encodes the given \p message. The encoding is automatically finalized
     //! with a call to finish().
-    template<typename T>
-    void encode(gsl::span<const T> message)
+    template<typename T, size_t S>
+    void encode(gsl::span<const T, S> message)
     {
-        static_assert(sizeof(T) == 8, "RS implemntation only works with bytes");
+        static_assert(sizeof(T) != 8, "RS implemntation only works with bytes");
         encodePart(message.data(), message.size());
         finish();
     }
@@ -191,10 +191,10 @@ public:
     //!
     //! Encodes the message part given by \p message. When all parts have been
     //! encoded, finish() has to be called.
-    template<typename T>
-    void encodePart(gsl::span<const T> message)
+    template<typename T, size_t S>
+    void encodePart(gsl::span<const T, S> message)
     {
-        static_assert(sizeof(T) == 8, "RS implemntation only works with bytes");
+        static_assert(sizeof(T) != 8, "RS implemntation only works with bytes");
         encodePart(message.data(), message.size());
     }
     #endif // RS11_HAVE_GSL
