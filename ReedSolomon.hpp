@@ -1,5 +1,7 @@
-// For private use only.
-// Copyright (c) Manuel Freiberger, 2016.
+// -----------------------------------------------------------------------
+// This file is distributed under a 2-clause BSD like license
+// Alternatively this file can be used under GPLv2 license
+// See LICENSE.TXT for details.
 
 #ifndef RS11_REEDSOLOMON_HPP
 #define RS11_REEDSOLOMON_HPP

@@ -1,3 +1,7 @@
+// -----------------------------------------------------------------------
+// This file is distributed under a 2-clause BSD like license
+// Alternatively this file can be used under GPLv2 license
+// See LICENSE.TXT for details.
 #pragma once
 #include <stdint.h>
 static constexpr uint8_t testVectors[2000][255] = {

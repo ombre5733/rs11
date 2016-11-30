@@ -1,11 +1,12 @@
-// For private use only.
-// Copyright (c) Manuel Freiberger, 2016.
 
 #ifndef RS11_USER_CONFIG_HPP
 #define RS11_USER_CONFIG_HPP
 
 // If this macro is defined, GSL support is added.
 // #define RS11_HAVE_GSL
+
+// If this macro is defined, exceptions are disabled
+// #define RS11_NO_EXCEPTIONS
 
 // ----=====================================================================----
 //     Private section.
