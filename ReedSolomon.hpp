@@ -13,15 +13,12 @@
 #include <cstddef>
 #include <cstdint>
 
-#ifdef RS11_HAVE_GSL
-#include <gsl/span>
-#endif // RS11_HAVE_GSL
-
-#ifndef RS11_NO_EXCEPTIONS
-    #define RS11_ERR_NOEXCEPT
-#else
-    #define RS11_ERR_NOEXCEPT   noexcept
+#if defined(_MSC_VER)
+    #if _MSC_VER < 1911
+        #define CONSTEXPR_WORKAROUND
+    #endif
 #endif
+
 namespace rs11
 {
 
@@ -76,20 +73,20 @@ public:
 
 
     //! Creates a Reed-Solomon encoder.
-#ifndef _MSC_VER
+#ifndef CONSTEXPR_WORKAROUND
     constexpr
 #endif
     ReedSolomonEncoder() noexcept
         : m_polynomial(detail::createReedSolomonGeneratorPolynomial<numParitySyms>()),
-          m_scratchIter{&m_scratch[0]},
           m_scratch(),
+          m_scratchIter{&m_scratch[0]},
           m_size{0},
           m_finished{false}
     {
     }
 
     //! Creates a Reed-Solomon encoder, with agiven polynom
-#ifndef _MSC_VER
+#ifndef CONSTEXPR_WORKAROUND
     constexpr
 #endif
     ReedSolomonEncoder(const Galois::GF256Polynomial<numParitySyms>& poly) noexcept
@@ -179,11 +176,11 @@ public:
     //!
     //! Encodes the given \p message. The encoding is automatically finalized
     //! with a call to finish().
-    template<typename T, size_t S>
+    template<typename T, int S>
     void encode(gsl::span<const T, S> message)
     {
         static_assert(sizeof(T) != 8, "RS implemntation only works with bytes");
-        encodePart(message.data(), message.size());
+        encodePart(reinterpret_cast<const uint8_t*>(message.data()), message.size());
         finish();
     }
 
@@ -191,7 +188,7 @@ public:
     //!
     //! Encodes the message part given by \p message. When all parts have been
     //! encoded, finish() has to be called.
-    template<typename T, size_t S>
+    template<typename T, int S>
     void encodePart(gsl::span<const T, S> message)
     {
         static_assert(sizeof(T) != 8, "RS implemntation only works with bytes");
@@ -474,6 +471,11 @@ public:
         decodePart(message.data(), message.size());
         finish();
     }
+    void decode(gsl::span<const gsl::byte> message)
+    {
+        decodePart(reinterpret_cast<const uint8_t*>(message.data()), message.size());
+        finish();
+    }
 
     //! \brief Decodes a part of a message.
     //!
@@ -482,6 +484,10 @@ public:
     void decodePart(gsl::span<const std::uint8_t> message)
     {
         decodePart(message.data(), message.size());
+    }
+    void decodePart(gsl::span<const gsl::byte> message)
+    {
+        decodePart(reinterpret_cast<const uint8_t*>(message.data()), message.size()) ;
     }
 #endif // RS11_HAVE_GSL
 
@@ -636,10 +642,10 @@ public:
     //! contain errors, an empty range is returned.
     ErrorRange errors() const
     {
-        if (!m_finished)
-            throw std::exception();
-        if (m_result == DecoderResult::Defective)
-            throw std::exception();
+            if (!m_finished)
+                throw std::exception();
+            if (m_result == DecoderResult::Defective)
+                throw std::exception();
 
         return ErrorRange(&m_errors[0], &m_errors[0] + m_numErrors);
     }

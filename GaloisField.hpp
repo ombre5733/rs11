@@ -271,7 +271,12 @@ public:
 //        : _m_coefficients{}
 //    {
 //    }
-#ifndef _MSC_VER
+#if defined(_MSC_VER)
+    #if _MSC_VER <= 1911
+        #define RS11_NO_GF_OP
+    #endif
+#endif
+#ifndef RS11_NO_GF_OP
     template <std::size_t TDeg>
     constexpr
     auto operator+(const GF256Polynomial<TDeg>& b) const noexcept
